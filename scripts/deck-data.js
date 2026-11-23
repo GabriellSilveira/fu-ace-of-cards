@@ -2,7 +2,7 @@ export const MODULE_ID = "fu-ace-of-cards";
 export const CORE_DECK_PATH = "cards/light-soft";
 
 const resolvedFilesCache = {
-  back: `${CORE_DECK_PATH}/back.webp`,
+  back: "cards/backs/light-soft.webp",
   joker1: `${CORE_DECK_PATH}/black-joker.webp`,
   joker2: `${CORE_DECK_PATH}/red-joker.webp`,
   aces: {
@@ -103,9 +103,6 @@ export async function syncCoreDeckCatalog() {
     const result = await picker.browse("public", CORE_DECK_PATH);
     const files = result?.files || [];
     if (!files.length) return;
-
-    const backFile = files.find(f => /\/back[^/]*\.webp$/i.test(f));
-    if (backFile) resolvedFilesCache.back = backFile;
 
     const blackJoker = files.find(f => /\/black-joker\.webp$/i.test(f));
     const redJoker = files.find(f => /\/red-joker\.webp$/i.test(f));
