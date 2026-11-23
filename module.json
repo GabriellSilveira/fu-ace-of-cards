@@ -1,0 +1,36 @@
+{
+  "id": "fu-ace-of-cards",
+  "title": "Fabula Ultima - Ace of Cards (Cartomante)",
+  "description": "Baralho interativo em tempo real, detecção automática de conjuntos, controle de permissões e integração com chat para a classe Carteador / Ace of Cards no Project FU.",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13.351"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "projectfu",
+        "type": "system",
+        "compatibility": {
+          "minimum": "4.0.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/ace-of-cards.css"
+  ],
+  "socket": true,
+  "authors": [
+    {
+      "name": "Gabriell"
+    }
+  ],
+  "url": "https://github.com/GabriellSilveira/fu-ace-of-cards",
+  "manifest": "https://raw.githubusercontent.com/GabriellSilveira/fu-ace-of-cards/main/module.json",
+  "download": "https://github.com/GabriellSilveira/fu-ace-of-cards/archive/refs/heads/main.zip"
+}

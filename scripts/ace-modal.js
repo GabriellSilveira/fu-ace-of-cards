@@ -1,0 +1,960 @@
+import {
+  MODULE_ID,
+  SUITS,
+  createFullDeck,
+  getCardBackUrl,
+  getCardImageUrl,
+  buildFallbackCardSvg,
+  detectCombinations
+} from "./deck-data.js";
+
+const STORAGE_POS_KEY = `${MODULE_ID}.modalPosition`;
+
+export class AceOfCardsModal {
+  constructor() {
+    this.element = null;
+    this.isOpen = false;
+    this.selectedHandIds = new Set();
+    this.chosenElement = null;
+    this.chosenConditions = new Set(["shaken", "slow"]);
+    this.spendMpAuto = true;
+    this.showDiscardViewer = false;
+  }
+
+  getAceActor() {
+    return (
+      game.actors.find(a =>
+        a.items?.some(i => i.type === "class" && i.system?.fuid === "ace-of-cards")
+      ) ||
+      game.actors.find(a => a.name.toLowerCase().includes("varian")) ||
+      null
+    );
+  }
+
+  canInteract() {
+    if (game.user.isGM) return true;
+    const actor = this.getAceActor();
+    if (!actor) return false;
+    return actor.testUserPermission(game.user, "OWNER");
+  }
+
+  getSkillNP(actor, fuid, fallback = 1) {
+    const item = actor?.items?.find(i => i.system?.fuid === fuid);
+    return Number(item?.system?.level?.value ?? fallback);
+  }
+
+  getState() {
+    const actor = this.getAceActor();
+    const saved = actor?.getFlag(MODULE_ID, "deckState");
+    if (saved && Array.isArray(saved.deck) && Array.isArray(saved.hand) && Array.isArray(saved.discard)) {
+      return foundry.utils.deepClone(saved);
+    }
+    return {
+      deck: this.shuffleArray(createFullDeck()),
+      hand: [],
+      discard: [],
+      vanguard: [],
+      inConflict: false
+    };
+  }
+
+  async saveState(newState) {
+    if (!this.canInteract()) {
+      ui.notifications.warn("Apenas o Mestre ou o jogador do Carteador pode manipular o baralho.");
+      return;
+    }
+    const actor = this.getAceActor();
+    if (!actor) return;
+
+    await actor.setFlag(MODULE_ID, "deckState", newState);
+    game.socket.emit(`module.${MODULE_ID}`, { type: "refresh" });
+    this.render();
+  }
+
+  shuffleArray(arr) {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  /**
+   * Compra N cartas respeitando a regra oficial de reembaralhar o descarte quando o baralho acaba.
+   */
+  drawFromDeck(state, count) {
+    let reshuffled = false;
+    for (let i = 0; i < count; i++) {
+      if (state.deck.length === 0) {
+        if (state.discard.length === 0) break;
+        state.deck = this.shuffleArray(state.discard);
+        state.discard = [];
+        reshuffled = true;
+      }
+      const card = state.deck.shift();
+      if (card) state.hand.push(card);
+    }
+    return reshuffled;
+  }
+
+  toggle() {
+    if (this.isOpen) this.close();
+    else this.open();
+  }
+
+  open() {
+    this.isOpen = true;
+    if (!this.element) {
+      this.createContainer();
+    }
+    this.element.style.display = "flex";
+    this.render();
+  }
+
+  close() {
+    this.isOpen = false;
+    if (this.element) {
+      this.element.style.display = "none";
+    }
+  }
+
+  createContainer() {
+    const div = document.createElement("div");
+    div.id = "fu-ace-modal";
+    div.className = "fu-ace-modal";
+
+    const savedPos = JSON.parse(localStorage.getItem(STORAGE_POS_KEY) || "null");
+    if (savedPos && typeof savedPos.left === "number" && typeof savedPos.top === "number") {
+      div.style.left = `${Math.max(10, Math.min(window.innerWidth - 320, savedPos.left))}px`;
+      div.style.top = `${Math.max(10, Math.min(window.innerHeight - 200, savedPos.top))}px`;
+    } else {
+      div.style.left = "90px";
+      div.style.top = "95px";
+    }
+
+    document.body.appendChild(div);
+    this.element = div;
+  }
+
+  bindDrag(handleEl) {
+    if (!handleEl || !this.element) return;
+    let isDragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    handleEl.addEventListener("pointerdown", e => {
+      if (e.target.closest("button, input, select, label")) return;
+      isDragging = true;
+      const rect = this.element.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      handleEl.setPointerCapture(e.pointerId);
+    });
+
+    handleEl.addEventListener("pointermove", e => {
+      if (!isDragging) return;
+      const left = Math.max(0, Math.min(window.innerWidth - 180, e.clientX - offsetX));
+      const top = Math.max(0, Math.min(window.innerHeight - 80, e.clientY - offsetY));
+      this.element.style.left = `${left}px`;
+      this.element.style.top = `${top}px`;
+    });
+
+    handleEl.addEventListener("pointerup", e => {
+      if (!isDragging) return;
+      isDragging = false;
+      handleEl.releasePointerCapture(e.pointerId);
+      const rect = this.element.getBoundingClientRect();
+      localStorage.setItem(STORAGE_POS_KEY, JSON.stringify({ left: rect.left, top: rect.top }));
+    });
+  }
+
+  async postChatCard({ title, subtitle, bodyHtml, cards = [], footerHtml = "" }) {
+    const actor = this.getAceActor();
+    const cardsHtml = cards.length
+      ? `<div class="fu-ace-chat-cards">
+          ${cards
+            .map(
+              c => `<span class="fu-ace-chat-pill" style="border-color:${
+                c.isJoker ? "#fbbf24" : SUITS[c.suit]?.color || "#38bdf8"
+              }">${c.name}</span>`
+            )
+            .join("")}
+        </div>`
+      : "";
+
+    const content = `
+      <div class="fu-ace-chat-card">
+        <div class="fu-ace-chat-header">
+          <div class="fu-ace-chat-title">${title}</div>
+          ${subtitle ? `<div class="fu-ace-chat-sub">${subtitle}</div>` : ""}
+        </div>
+        ${cardsHtml}
+        <div class="fu-ace-chat-body">${bodyHtml}</div>
+        ${footerHtml ? `<div class="fu-ace-chat-footer">${footerHtml}</div>` : ""}
+      </div>
+    `;
+
+    await ChatMessage.create({
+      speaker: actor ? ChatMessage.getSpeaker({ actor }) : ChatMessage.getSpeaker(),
+      content
+    });
+  }
+
+  // ==================== AÇÕES DO BARALHO E HABILIDADES ====================
+
+  async actionStartConflict() {
+    const state = {
+      deck: this.shuffleArray(createFullDeck()),
+      hand: [],
+      discard: [],
+      vanguard: [],
+      inConflict: true
+    };
+    this.selectedHandIds.clear();
+    this.drawFromDeck(state, 5);
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: "Início de Conflito — Baralho Embaralhado",
+      subtitle: "30 cartas embaralhadas • 5 cartas compradas para a mão inicial",
+      bodyHtml: `<p>O baralho do destino foi embaralhado e <strong>5 cartas</strong> foram puxadas.</p>`
+    });
+  }
+
+  async actionEndConflict() {
+    const state = {
+      deck: this.shuffleArray(createFullDeck()),
+      hand: [],
+      discard: [],
+      vanguard: [],
+      inConflict: false
+    };
+    this.selectedHandIds.clear();
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: "Fim de Conflito — Baralho Recolhido",
+      subtitle: "Mão, descarte e vanguarda devolvidos ao baralho (30 cartas)",
+      bodyHtml: `<p>Todas as 30 cartas foram embaralhadas de volta ao baralho.</p>`
+    });
+  }
+
+  async actionDraw(count = 1) {
+    const state = this.getState();
+    const before = state.hand.length;
+    const reshuffled = this.drawFromDeck(state, count);
+    const drawn = state.hand.length - before;
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: `Comprou ${drawn} Carta${drawn > 1 ? "s" : ""}`,
+      subtitle: `Baralho: ${state.deck.length} | Mão: ${state.hand.length} | Descarte: ${state.discard.length}`,
+      bodyHtml: reshuffled
+        ? `<p>A pilha de descarte foi reembaralhada para formar um novo baralho antes de completar a compra.</p>`
+        : `<p>Comprou <strong>${drawn}</strong> carta(s) do topo do baralho.</p>`
+    });
+  }
+
+  async actionShuffleDeckOnly() {
+    const state = this.getState();
+    state.deck = this.shuffleArray(state.deck);
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: "Baralho Embaralhado",
+      subtitle: `${state.deck.length} cartas restantes no baralho`,
+      bodyHtml: `<p>As cartas restantes no baralho foram embaralhadas.</p>`
+    });
+  }
+
+  async actionDiscardSelected(reason = "Descarte Manual") {
+    const state = this.getState();
+    const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
+    if (!selected.length) {
+      ui.notifications.warn("Selecione ao menos uma carta na mão.");
+      return;
+    }
+
+    state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
+    // Topo do descarte fica no final do array (face para cima na ordem escolhida)
+    state.discard.push(...selected);
+    this.selectedHandIds.clear();
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: reason,
+      subtitle: `${selected.length} carta(s) enviada(s) para a pilha de descarte`,
+      cards: selected,
+      bodyHtml: `<p>Cartas colocadas com a face para cima no topo da pilha de descarte.</p>`
+    });
+  }
+
+  async actionMoveSelectedToDeck(position = "bottom") {
+    const state = this.getState();
+    const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
+    if (!selected.length) {
+      ui.notifications.warn("Selecione ao menos uma carta na mão.");
+      return;
+    }
+
+    state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
+    if (position === "top") {
+      state.deck.unshift(...selected);
+    } else {
+      state.deck.push(...selected);
+    }
+    this.selectedHandIds.clear();
+    await this.saveState(state);
+
+    const posLabel = position === "top" ? "topo" : "fundo";
+    await this.postChatCard({
+      title: `Cartas Movidas para o ${posLabel.toUpperCase()} do Baralho`,
+      subtitle: `${selected.length} carta(s) devolvida(s) com face para baixo`,
+      bodyHtml: `<p><strong>${selected.length}</strong> carta(s) da mão foram colocadas no <strong>${posLabel}</strong> do baralho.</p>`
+    });
+  }
+
+  async actionResolveMagicCards(combo) {
+    const actor = this.getAceActor();
+    const state = this.getState();
+    const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
+
+    if (selected.length < 2) {
+      ui.notifications.warn("Selecione de 2 a 5 cartas para formar um conjunto.");
+      return;
+    }
+
+    const magicCardsNP = this.getSkillNP(actor, "magic-cards", 3);
+    const maxMpAllowed = 10 + magicCardsNP * 5;
+    const mpCost = selected.length * 5;
+
+    if (mpCost > maxMpAllowed) {
+      ui.notifications.warn(`Cartas Mágicas (NP ${magicCardsNP}) permite gastar no máximo ${maxMpAllowed} PM.`);
+      return;
+    }
+
+    // Desconta PM automaticamente na ficha do Varian se marcado
+    if (this.spendMpAuto && actor) {
+      const currentMp = Number(actor.system?.resources?.mp?.value ?? 0);
+      if (currentMp < mpCost) {
+        ui.notifications.warn(`PM insuficiente (${currentMp}/${mpCost} PM).`);
+        return;
+      }
+      await actor.update({ "system.resources.mp.value": currentMp - mpCost });
+    }
+
+    // Verifica triggers de Altos e Baixos
+    const highLowNP = this.getSkillNP(actor, "high-or-low", 1);
+    const hasJoker = selected.some(c => c.isJoker);
+    const hasSeven = selected.some(c => !c.isJoker && c.value === 7);
+    const hasOne = selected.some(c => !c.isJoker && c.value === 1);
+
+    const highLowNotes = [];
+    if (hasJoker || hasSeven) {
+      highLowNotes.push(`<strong>Altos e Baixos (+${highLowNP} dano):</strong> você causa <strong>${highLowNP}</strong> de dano extra até o início do seu próximo turno.`);
+    }
+    if (hasJoker || hasOne) {
+      highLowNotes.push(`<strong>Altos e Baixos (-${highLowNP} dano sofrido):</strong> reduz todo dano sofrido em <strong>${highLowNP}</strong> até o início do seu próximo turno.`);
+    }
+    if (!hasJoker && !hasSeven && !hasOne) {
+      const healHp = highLowNP * 2;
+      highLowNotes.push(`<strong>Altos e Baixos:</strong> recupera @HEAL[${healHp} hp] (nenhum Curinga, 1 ou 7 usado).`);
+    }
+
+    // Descarta as cartas usadas e compra a mesma quantidade
+    state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
+    state.discard.push(...selected);
+    const reshuffled = this.drawFromDeck(state, selected.length);
+    this.selectedHandIds.clear();
+    await this.saveState(state);
+
+    // Monta o texto do efeito com enrichers nativos do Project FU
+    let effectBlock = `<p><strong>Sem conjunto válido:</strong> cartas resolvidas individualmente.</p>`;
+    if (combo) {
+      const chosenSuitKey =
+        this.chosenElement && combo.uniqueSuits.includes(this.chosenElement)
+          ? this.chosenElement
+          : combo.uniqueSuits[0];
+      const chosenSuit = SUITS[chosenSuitKey] || SUITS.diamonds;
+
+      if (combo.id === "magic-pair") {
+        effectBlock = `
+          <p><strong>${combo.name}:</strong> Realize um <strong>ataque livre</strong> com uma arma equipada. Todo o dano causado torna-se do tipo <strong>${chosenSuit.elementLabel}</strong>.</p>
+        `;
+      } else if (combo.id === "double-trouble") {
+        effectBlock = `
+          <p><strong>${combo.name}:</strong> Escolha <strong>1 ou 2 inimigos</strong> presentes na cena: @DMG[${combo.damage} ${chosenSuit.element}]</p>
+        `;
+      } else if (combo.id === "magic-flush") {
+        effectBlock = `
+          <p><strong>${combo.name}:</strong> Cada inimigo presente na cena sofre: @DMG[${combo.damage} ${combo.damageType}]</p>
+        `;
+      } else if (combo.id === "blinding-flush") {
+        effectBlock = `
+          <p><strong>${combo.name}:</strong> Cada inimigo presente na cena sofre: @DMG[${combo.damage} ${combo.damageType}]</p>
+        `;
+      } else if (combo.id === "support-triple") {
+        effectBlock = `
+          <p><strong>${combo.name}:</strong> Você e todos os aliados presentes na cena recuperam @HEAL[${combo.heal} hp] e @HEAL[${combo.heal} mp].</p>
+        `;
+      } else if (combo.id === "jackpot") {
+        effectBlock = `
+          <p><strong>${combo.name}:</strong> Você e todos os aliados presentes na cena recuperam @HEAL[777 hp] e @HEAL[777 mp], e PJs rendidos recuperam a consciência!</p>
+        `;
+      } else if (combo.id === "full-status") {
+        const condList = Array.from(this.chosenConditions);
+        const condTags = condList.map(c => `@EFFECT[${c}]`).join(" e ");
+        const targetText = combo.isHighestEven
+          ? `Você e todos os aliados na cena <strong>se recuperam</strong> de: ${condTags}`
+          : `Cada inimigo na cena <strong>sofre</strong>: ${condTags}`;
+        effectBlock = `<p><strong>${combo.name}:</strong> ${targetText}</p>`;
+      }
+    }
+
+    await this.postChatCard({
+      title: `Cartas Mágicas — ${combo ? combo.name : "Conjunto Livre"}`,
+      subtitle: `Custo: ${mpCost} PM (${selected.length} cartas) • Comprou ${selected.length} nova(s) carta(s)`,
+      cards: selected,
+      bodyHtml: `
+        ${effectBlock}
+        <div class="fu-ace-chat-subblock">${highLowNotes.join("<br>")}</div>
+        ${reshuffled ? `<p><em>O descarte foi reembaralhado durante a compra.</em></p>` : ""}
+      `,
+      footerHtml: `@LOSS[${mpCost} mp]`
+    });
+  }
+
+  async actionMulligan() {
+    const actor = this.getAceActor();
+    const state = this.getState();
+    const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
+
+    if (!selected.length) {
+      ui.notifications.warn("Selecione as cartas da mão que deseja trocar no Mulligan.");
+      return;
+    }
+
+    const mulliganNP = this.getSkillNP(actor, "mulligan", 1);
+    state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
+    state.discard.push(...selected);
+    const reshuffled = this.drawFromDeck(state, selected.length);
+    this.selectedHandIds.clear();
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: `Mulligan (NP ${mulliganNP})`,
+      subtitle: `Descartou ${selected.length} carta(s) e comprou ${selected.length} nova(s)`,
+      cards: selected,
+      bodyHtml: `<p>Descartou <strong>${selected.length}</strong> carta(s) da mão e comprou a mesma quantidade do baralho.</p>
+        ${reshuffled ? `<p><em>A pilha de descarte foi reembaralhada durante a compra.</em></p>` : ""}`
+    });
+  }
+
+  async actionTrapCardFromHand() {
+    const actor = this.getAceActor();
+    const state = this.getState();
+    const trapNP = this.getSkillNP(actor, "trap-card", 4);
+    const maxSpellMp = trapNP * 5;
+    const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
+
+    if (!selected.length) {
+      ui.notifications.warn("Selecione na mão as cartas compatíveis (Curingas ou naipe da ação inimiga).");
+      return;
+    }
+    if (selected.length > trapNP + 1) {
+      ui.notifications.warn(`Carta Armadilha (NP ${trapNP}) permite descartar até ${trapNP + 1} cartas.`);
+      return;
+    }
+
+    state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
+    state.discard.push(...selected);
+    this.drawFromDeck(state, selected.length);
+    this.selectedHandIds.clear();
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: `Carta Armadilha ativada! (NP ${trapNP})`,
+      subtitle: `Descartou ${selected.length} carta(s) e comprou ${selected.length}`,
+      cards: selected,
+      bodyHtml: `<p>Em resposta à ação inimiga, você pode realizar a ação <strong>Feitiço</strong> gratuitamente, lançando um feitiço com custo total de até <strong>${maxSpellMp} PM</strong> (pagando seu custo em PM).</p>`
+    });
+  }
+
+  async actionTrapCardBottomReveal(declaredSuitKey) {
+    const actor = this.getAceActor();
+    const state = this.getState();
+    const trapNP = this.getSkillNP(actor, "trap-card", 4);
+    const maxSpellMp = trapNP * 5;
+
+    if (state.deck.length === 0) {
+      if (state.discard.length === 0) return;
+      state.deck = this.shuffleArray(state.discard);
+      state.discard = [];
+    }
+
+    const bottomCard = state.deck.pop();
+    state.discard.push(bottomCard);
+    await this.saveState(state);
+
+    const declaredSuit = SUITS[declaredSuitKey];
+    const success = bottomCard.isJoker || bottomCard.suit === declaredSuitKey;
+
+    await this.postChatCard({
+      title: `Carta Armadilha — Fundo do Baralho`,
+      subtitle: `Naipe declarado: ${declaredSuit.name} (${declaredSuit.symbol} ${declaredSuit.elementLabel})`,
+      cards: [bottomCard],
+      bodyHtml: success
+        ? `<p><strong>SUCESSO!</strong> A carta do fundo era <strong>${bottomCard.name}</strong>. Você pode lançar um <strong>Feitiço</strong> de graça com custo até <strong>${maxSpellMp} PM</strong>!</p>`
+        : `<p><strong>Falhou:</strong> A carta do fundo era <strong>${bottomCard.name}</strong> (não corresponde a ${declaredSuit.name}).</p>`
+    });
+  }
+
+  async actionHighOrLowSwap() {
+    const state = this.getState();
+    const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
+    if (selected.length !== 1) {
+      ui.notifications.warn("Selecione exatamente 1 carta na mão para descartar ao usar Altos e Baixos.");
+      return;
+    }
+
+    state.hand = state.hand.filter(c => c.id !== selected[0].id);
+    state.discard.push(selected[0]);
+    this.drawFromDeck(state, 1);
+    this.selectedHandIds.clear();
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: "Altos e Baixos — Troca Crítica",
+      subtitle: "Comprou 1 carta e descartou 1 carta da mão",
+      cards: selected,
+      bodyHtml: `<p>Após rolar um sucesso crítico ou falha crítica, comprou 1 carta do baralho e descartou <strong>${selected[0].name}</strong>.</p>`
+    });
+  }
+
+  async actionDoubleOrNothing() {
+    await this.postChatCard({
+      title: "Dobro ou Nada!",
+      subtitle: "Declaração antes do Teste",
+      bodyHtml: `<p>O Carteador declarou <strong>Dobro ou Nada</strong> antes da rolagem! Dados com resultado <strong>par</strong> têm seu valor dobrado; dados <strong>ímpares</strong> contam como <strong>1</strong>.</p>`
+    });
+  }
+
+  async actionPlaceVanguard() {
+    const state = this.getState();
+    if (state.vanguard.length >= 2) {
+      ui.notifications.warn("Você já possui o máximo de 2 cartas de vanguarda em jogo.");
+      return;
+    }
+    const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
+    if (selected.length !== 1) {
+      ui.notifications.warn("Selecione exatamente 1 carta da mão para baixar como Carta de Vanguarda.");
+      return;
+    }
+
+    state.hand = state.hand.filter(c => c.id !== selected[0].id);
+    state.vanguard.push(selected[0]);
+    this.drawFromDeck(state, 1);
+    this.selectedHandIds.clear();
+    await this.saveState(state);
+
+    await this.postChatCard({
+      title: "Vanguarda de Cartas",
+      subtitle: `Baixou 1 carta virada para baixo (${state.vanguard.length}/2 em jogo) e comprou 1 carta`,
+      bodyHtml: `<p>Uma carta foi posicionada com a face para baixo na <strong>Vanguarda</strong> e 1 nova carta foi comprada do baralho.</p>`
+    });
+  }
+
+  async actionRevealVanguard(index) {
+    const state = this.getState();
+    const card = state.vanguard[index];
+    if (!card) return;
+
+    state.vanguard.splice(index, 1);
+    state.discard.push(card);
+    await this.saveState(state);
+
+    const elemText = card.isJoker
+      ? "<strong>Curinga (absorve qualquer tipo de dano!)</strong>"
+      : `naipe de <strong>${SUITS[card.suit].name} (${SUITS[card.suit].elementLabel})</strong>`;
+
+    await this.postChatCard({
+      title: "Vanguarda de Cartas Revelada!",
+      subtitle: "Carta enviada ao topo da pilha de descarte",
+      cards: [card],
+      bodyHtml: `<p>Revelou <strong>${card.name}</strong> (${elemText}). Se corresponder ao tipo de dano sofrido, você <strong>não sofre o dano</strong> e recupera essa mesma quantidade em <strong>PM</strong>!</p>`
+    });
+  }
+
+  // ==================== RENDERIZAÇÃO DA INTERFACE ====================
+
+  render() {
+    if (!this.element || !this.isOpen) return;
+
+    const actor = this.getAceActor();
+    const canEdit = this.canInteract();
+    const state = this.getState();
+    const actorLevel = Number(actor?.system?.level?.value ?? 21);
+    const mpCurrent = Number(actor?.system?.resources?.mp?.value ?? 0);
+    const mpMax = Number(actor?.system?.resources?.mp?.max ?? 0);
+
+    // Limpa seleções inválidas
+    const handIds = new Set(state.hand.map(c => c.id));
+    for (const id of Array.from(this.selectedHandIds)) {
+      if (!handIds.has(id)) this.selectedHandIds.delete(id);
+    }
+
+    const selectedCards = state.hand.filter(c => this.selectedHandIds.has(c.id));
+    const combos = detectCombinations(selectedCards, actorLevel);
+    const activeCombo = combos[0] || null;
+
+    const topDiscard = state.discard.length ? state.discard[state.discard.length - 1] : null;
+    const backImg = getCardBackUrl();
+    const backFallback = buildFallbackCardSvg(null);
+
+    const totalHand = state.hand.length;
+    const handHtml = totalHand
+      ? state.hand
+          .map((card, index) => {
+            const isSelected = this.selectedHandIds.has(card.id);
+            const mid = (totalHand - 1) / 2;
+            const offset = index - mid;
+            const angle = offset * 4.5;
+            const translateY = Math.abs(offset) * 3.5;
+            const fallback = buildFallbackCardSvg(card);
+
+            return `
+              <div class="fu-ace-card ${isSelected ? "is-selected" : ""}"
+                   data-card-id="${card.id}"
+                   title="${card.name}"
+                   style="--fan-angle:${angle}deg; --fan-y:${translateY}px; z-index:${isSelected ? 50 + index : 10 + index};">
+                <img src="${getCardImageUrl(card)}" data-fallback="${fallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="${card.name}" />
+                <span class="fu-ace-card-tag">${card.shortLabel}</span>
+              </div>
+            `;
+          })
+          .join("")
+      : `<div class="fu-ace-empty-hand">Mão vazia — clique em <strong>Iniciar Conflito</strong> ou <strong>Comprar</strong></div>`;
+
+    const vanguardHtml = [0, 1]
+      .map(slotIdx => {
+        const vCard = state.vanguard[slotIdx];
+        if (!vCard) {
+          return `<div class="fu-ace-vanguard-slot is-empty" title="Slot Vanguarda ${slotIdx + 1}">Vanguarda ${slotIdx + 1}</div>`;
+        }
+        return `
+          <div class="fu-ace-vanguard-slot has-card" data-vanguard-idx="${slotIdx}" title="Clique para revelar Carta de Vanguarda">
+            <img src="${backImg}" data-fallback="${backFallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="Vanguarda" />
+            <span>Revelar #${slotIdx + 1}</span>
+          </div>
+        `;
+      })
+      .join("");
+
+    // Seletor dinâmico de elemento ou condições quando o conjunto exige escolha
+    let comboExtraHtml = "";
+    if (activeCombo && canEdit) {
+      if (activeCombo.id === "magic-pair" || activeCombo.id === "double-trouble") {
+        const suitOptions = activeCombo.uniqueSuits
+          .map(sKey => {
+            const s = SUITS[sKey];
+            const active = (this.chosenElement || activeCombo.uniqueSuits[0]) === sKey;
+            return `<button type="button" class="fu-ace-chip ${active ? "is-active" : ""}" data-choose-suit="${sKey}">${s.symbol} ${s.elementLabel}</button>`;
+          })
+          .join("");
+        comboExtraHtml = `<div class="fu-ace-combo-opts"><span>Elemento:</span> ${suitOptions}</div>`;
+      } else if (activeCombo.id === "full-status") {
+        const conds = [
+          { id: "shaken", label: "Abalado" },
+          { id: "dazed", label: "Atordoado" },
+          { id: "weak", label: "Fraco" },
+          { id: "slow", label: "Lento" }
+        ];
+        comboExtraHtml = `<div class="fu-ace-combo-opts"><span>2 Condições:</span> ${conds
+          .map(
+            c =>
+              `<button type="button" class="fu-ace-chip ${this.chosenConditions.has(c.id) ? "is-active" : ""}" data-toggle-cond="${c.id}">${c.label}</button>`
+          )
+          .join("")}</div>`;
+      }
+    }
+
+    const discardViewerHtml = this.showDiscardViewer
+      ? `
+        <div class="fu-ace-discard-drawer">
+          <div class="fu-ace-drawer-head">
+            <strong>Pilha de Descarte (${state.discard.length} — ordem fixa, topo à direita)</strong>
+            <button type="button" data-action="toggle-discard-view"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="fu-ace-drawer-list">
+            ${
+              state.discard.length
+                ? state.discard
+                    .map(
+                      c => `<div class="fu-ace-mini-card" title="${c.name}">
+                        <img src="${getCardImageUrl(c)}" data-fallback="${buildFallbackCardSvg(c)}" onerror="this.onerror=null; this.src=this.dataset.fallback;" />
+                        <span>${c.shortLabel}</span>
+                      </div>`
+                    )
+                    .join("")
+                : `<span class="fu-ace-muted">Nenhuma carta descartada ainda.</span>`
+            }
+          </div>
+        </div>
+      `
+      : "";
+
+    this.element.innerHTML = `
+      <header class="fu-ace-header">
+        <div class="fu-ace-title">
+          <i class="fa-solid fa-wand-sparkles"></i>
+          <span>Baralho do Carteador — <strong>${actor?.name || "Varian"}</strong> (Nv.${actorLevel})</span>
+          <span class="fu-ace-mp-badge">PM: ${mpCurrent}/${mpMax}</span>
+          ${!canEdit ? `<span class="fu-ace-readonly-badge">Modo Espectador</span>` : ""}
+        </div>
+        <div class="fu-ace-win-btns">
+          <button type="button" data-action="close" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </header>
+
+      <div class="fu-ace-body">
+        <!-- COLUNA ESQUERDA: BARALHO E DESCARTE -->
+        <div class="fu-ace-piles-col">
+          <div class="fu-ace-pile-box" title="Baralho (${state.deck.length}/30 cartas)">
+            <div class="fu-ace-pile-card ${canEdit ? "is-clickable" : ""}" data-action="draw-1">
+              ${
+                state.deck.length > 0
+                  ? `<img src="${backImg}" data-fallback="${backFallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="Baralho" />`
+                  : `<div class="fu-ace-pile-empty">Vazio</div>`
+              }
+              <span class="fu-ace-pile-count">${state.deck.length}</span>
+            </div>
+            <span class="fu-ace-pile-label">Baralho</span>
+          </div>
+
+          <div class="fu-ace-pile-box" title="Clique para ver a pilha de descarte">
+            <div class="fu-ace-pile-card is-clickable" data-action="toggle-discard-view">
+              ${
+                topDiscard
+                  ? `<img src="${getCardImageUrl(topDiscard)}" data-fallback="${buildFallbackCardSvg(topDiscard)}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="${topDiscard.name}" />`
+                  : `<div class="fu-ace-pile-empty">Descarte</div>`
+              }
+              <span class="fu-ace-pile-count">${state.discard.length}</span>
+            </div>
+            <span class="fu-ace-pile-label">Descarte</span>
+          </div>
+        </div>
+
+        <!-- ÁREA DIREITA: MÃO EM LEQUE + CONTROLES -->
+        <div class="fu-ace-main-col">
+          <div class="fu-ace-hand-row">
+            <div class="fu-ace-hand-fan">
+              ${handHtml}
+            </div>
+            <div class="fu-ace-vanguard-col">
+              ${vanguardHtml}
+            </div>
+          </div>
+
+          <!-- PAINEL DE DETECÇÃO DE CONJUNTO -->
+          <div class="fu-ace-combo-banner ${activeCombo ? "has-combo" : ""}">
+            ${
+              selectedCards.length === 0
+                ? `<span>Selecione cartas na mão para montar um conjunto ou descartar.</span>`
+                : activeCombo
+                ? `<div class="fu-ace-combo-info">
+                     <div class="fu-ace-combo-top">
+                       <strong>✨ ${activeCombo.name}</strong>
+                       <span>(${selectedCards.length} cartas • ${selectedCards.length * 5} PM)</span>
+                     </div>
+                     <div class="fu-ace-combo-desc">${activeCombo.summary}</div>
+                     ${comboExtraHtml}
+                   </div>`
+                : `<span><strong>${selectedCards.length} carta(s) selecionada(s)</strong> (${selectedCards.length * 5} PM) — nenhum conjunto especial formado.</span>`
+            }
+          </div>
+
+          <!-- BOTÕES DE AÇÃO -->
+          ${
+            canEdit
+              ? `
+            <div class="fu-ace-actions-grid">
+              <button type="button" class="fu-ace-btn is-primary" data-action="start-conflict" title="Embaralha as 30 cartas e compra 5">
+                <i class="fa-solid fa-play"></i> Iniciar Conflito (5)
+              </button>
+
+              <button type="button" class="fu-ace-btn is-accent" data-action="resolve-magic" ${selectedCards.length < 2 ? "disabled" : ""} title="Gasta 5 PM por carta, resolve o conjunto, descarta e compra">
+                <i class="fa-solid fa-sparkles"></i> Cartas Mágicas (${selectedCards.length * 5} PM)
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="draw-1">
+                <i class="fa-solid fa-plus"></i> Comprar 1
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="mulligan" ${selectedCards.length === 0 ? "disabled" : ""}>
+                <i class="fa-solid fa-arrows-rotate"></i> Mulligan (${selectedCards.length})
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="trap-hand" ${selectedCards.length === 0 ? "disabled" : ""} title="Descarta cartas selecionadas da mão para Carta Armadilha e compra">
+                <i class="fa-solid fa-bolt"></i> Armadilha (Mão)
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="trap-bottom" title="Declara um naipe e descarta a carta do fundo do baralho">
+                <i class="fa-solid fa-layer-group"></i> Armadilha (Fundo)
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="high-low" ${selectedCards.length !== 1 ? "disabled" : ""} title="Crítico/Falha Crítica: compra 1 e descarta 1 selecionada">
+                <i class="fa-solid fa-scale-balanced"></i> Altos e Baixos
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="double-nothing">
+                <i class="fa-solid fa-dice"></i> Dobro ou Nada
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="place-vanguard" ${selectedCards.length !== 1 || state.vanguard.length >= 2 ? "disabled" : ""}>
+                <i class="fa-solid fa-shield-halved"></i> Vanguarda
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="discard-selected" ${selectedCards.length === 0 ? "disabled" : ""}>
+                <i class="fa-solid fa-trash-can"></i> Descartar (${selectedCards.length})
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="to-top" ${selectedCards.length === 0 ? "disabled" : ""}>
+                <i class="fa-solid fa-arrow-up"></i> Topo Baralho
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="to-bottom" ${selectedCards.length === 0 ? "disabled" : ""}>
+                <i class="fa-solid fa-arrow-down"></i> Fundo Baralho
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="shuffle-deck">
+                <i class="fa-solid fa-shuffle"></i> Embaralhar
+              </button>
+
+              <button type="button" class="fu-ace-btn is-danger" data-action="end-conflict">
+                <i class="fa-solid fa-stop"></i> Fim Conflito
+              </button>
+            </div>
+
+            <div class="fu-ace-footer-bar">
+              <label class="fu-ace-checkbox">
+                <input type="checkbox" data-action="toggle-mp-auto" ${this.spendMpAuto ? "checked" : ""} />
+                <span>Descontar PM da ficha automaticamente ao usar Cartas Mágicas</span>
+              </label>
+            </div>
+          `
+              : `<div class="fu-ace-spectator-note">Visualização pública sincronizada em tempo real.</div>`
+          }
+        </div>
+      </div>
+
+      ${discardViewerHtml}
+    `;
+
+    this.bindEvents(activeCombo, canEdit);
+  }
+
+  bindEvents(activeCombo, canEdit) {
+    this.bindDrag(this.element.querySelector(".fu-ace-header"));
+
+    this.element.querySelectorAll("[data-action='close']").forEach(btn =>
+      btn.addEventListener("click", () => this.close())
+    );
+
+    this.element.querySelectorAll("[data-action='toggle-discard-view']").forEach(el =>
+      el.addEventListener("click", () => {
+        this.showDiscardViewer = !this.showDiscardViewer;
+        this.render();
+      })
+    );
+
+    if (!canEdit) return;
+
+    // Seleção de cartas na mão
+    this.element.querySelectorAll(".fu-ace-card[data-card-id]").forEach(cardEl => {
+      cardEl.addEventListener("click", () => {
+        const id = cardEl.dataset.cardId;
+        if (this.selectedHandIds.has(id)) {
+          this.selectedHandIds.delete(id);
+        } else {
+          if (this.selectedHandIds.size >= 5) {
+            ui.notifications.warn("Você pode selecionar no máximo 5 cartas por vez.");
+            return;
+          }
+          this.selectedHandIds.add(id);
+        }
+        this.render();
+      });
+    });
+
+    // Revelar Vanguarda
+    this.element.querySelectorAll(".fu-ace-vanguard-slot[data-vanguard-idx]").forEach(slotEl => {
+      slotEl.addEventListener("click", () => {
+        this.actionRevealVanguard(Number(slotEl.dataset.vanguardIdx));
+      });
+    });
+
+    // Escolha de elemento no conjunto
+    this.element.querySelectorAll("[data-choose-suit]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        this.chosenElement = btn.dataset.chooseSuit;
+        this.render();
+      });
+    });
+
+    // Escolha de condições no Full Status
+    this.element.querySelectorAll("[data-toggle-cond]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const cond = btn.dataset.toggleCond;
+        if (this.chosenConditions.has(cond)) {
+          this.chosenConditions.delete(cond);
+        } else if (this.chosenConditions.size < 2) {
+          this.chosenConditions.add(cond);
+        }
+        this.render();
+      });
+    });
+
+    const mpCheckbox = this.element.querySelector("[data-action='toggle-mp-auto']");
+    if (mpCheckbox) {
+      mpCheckbox.addEventListener("change", e => {
+        this.spendMpAuto = e.target.checked;
+      });
+    }
+
+    const bindAction = (action, fn) => {
+      this.element.querySelectorAll(`[data-action='${action}']`).forEach(el =>
+        el.addEventListener("click", fn)
+      );
+    };
+
+    bindAction("start-conflict", () => this.actionStartConflict());
+    bindAction("end-conflict", () => this.actionEndConflict());
+    bindAction("draw-1", () => this.actionDraw(1));
+    bindAction("shuffle-deck", () => this.actionShuffleDeckOnly());
+    bindAction("discard-selected", () => this.actionDiscardSelected("Cartas Descartadas"));
+    bindAction("to-top", () => this.actionMoveSelectedToDeck("top"));
+    bindAction("to-bottom", () => this.actionMoveSelectedToDeck("bottom"));
+    bindAction("resolve-magic", () => this.actionResolveMagicCards(activeCombo));
+    bindAction("mulligan", () => this.actionMulligan());
+    bindAction("trap-hand", () => this.actionTrapCardFromHand());
+    bindAction("high-low", () => this.actionHighOrLowSwap());
+    bindAction("double-nothing", () => this.actionDoubleOrNothing());
+    bindAction("place-vanguard", () => this.actionPlaceVanguard());
+
+    bindAction("trap-bottom", async () => {
+      const buttons = Object.values(SUITS).reduce((acc, s) => {
+        acc[s.id] = {
+          label: `${s.symbol} ${s.name} (${s.elementLabel})`,
+          callback: () => this.actionTrapCardBottomReveal(s.id)
+        };
+        return acc;
+      }, {});
+      new Dialog({
+        title: "Carta Armadilha — Declarar Naipe",
+        content: "<p>Escolha o naipe que deseja declarar antes de revelar a carta do fundo do baralho:</p>",
+        buttons
+      }).render(true);
+    });
+  }
+}

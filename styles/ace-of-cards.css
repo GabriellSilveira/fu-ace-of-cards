@@ -1,0 +1,558 @@
+/* Botão na barra lateral esquerda (#scene-controls) */
+.fu-ace-control-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  color: #7dd3fc;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.fu-ace-control-btn:hover {
+  color: #38bdf8;
+  transform: scale(1.06);
+}
+
+/* Modal Transparente Arrastável */
+.fu-ace-modal {
+  position: fixed;
+  z-index: 120;
+  width: 680px;
+  max-width: calc(100vw - 32px);
+  display: none;
+  flex-direction: column;
+  background: rgba(13, 14, 24, 0.58);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), inset 0 0 20px rgba(56, 189, 248, 0.08);
+  color: #f1f5f9;
+  font-family: "Signika", sans-serif;
+  user-select: none;
+}
+
+.fu-ace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.72);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 12px 12px 0 0;
+  cursor: move;
+}
+
+.fu-ace-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.fu-ace-title i {
+  color: #38bdf8;
+}
+
+.fu-ace-mp-badge {
+  background: rgba(14, 165, 233, 0.22);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #7dd3fc;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fu-ace-readonly-badge {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fcd34d;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.fu-ace-win-btns button {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.fu-ace-win-btns button:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+/* Corpo da Modal */
+.fu-ace-body {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+}
+
+/* Pilhas à Esquerda (Baralho e Descarte) */
+.fu-ace-piles-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 96px;
+  flex-shrink: 0;
+}
+
+.fu-ace-pile-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.fu-ace-pile-card {
+  position: relative;
+  width: 86px;
+  height: 124px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.65);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fu-ace-pile-card.is-clickable {
+  cursor: pointer;
+}
+
+.fu-ace-pile-card.is-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.55);
+  border-color: #38bdf8;
+}
+
+.fu-ace-pile-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: none;
+}
+
+.fu-ace-pile-empty {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fu-ace-pile-count {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(2, 6, 23, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.fu-ace-pile-label {
+  font-size: 11px;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+/* Coluna Direita: Mão em Leque + Vanguarda + Ações */
+.fu-ace-main-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fu-ace-hand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 152px;
+  padding: 8px 6px 4px;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+}
+
+.fu-ace-hand-fan {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 142px;
+  padding: 0 16px;
+}
+
+.fu-ace-empty-hand {
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.fu-ace-card {
+  position: relative;
+  width: 92px;
+  height: 132px;
+  margin-left: -24px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  transform: translateY(var(--fan-y, 0px)) rotate(var(--fan-angle, 0deg));
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  background: #0f172a;
+}
+
+.fu-ace-card:first-child {
+  margin-left: 0;
+}
+
+.fu-ace-card:hover {
+  transform: translateY(-14px) rotate(0deg) scale(1.06);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.85);
+  border-color: #38bdf8;
+  z-index: 90 !important;
+}
+
+.fu-ace-card.is-selected {
+  transform: translateY(-18px) rotate(0deg) scale(1.07);
+  border-color: #fbbf24;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.9);
+}
+
+.fu-ace-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: none;
+  pointer-events: none;
+}
+
+.fu-ace-card-tag {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(2, 6, 23, 0.85);
+  color: #f8fafc;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Vanguarda de Cartas (2 slots) */
+.fu-ace-vanguard-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.fu-ace-vanguard-slot {
+  position: relative;
+  height: 64px;
+  border-radius: 6px;
+  border: 1px dashed rgba(168, 85, 247, 0.45);
+  background: rgba(30, 27, 75, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 10px;
+  color: #a5b4fc;
+  overflow: hidden;
+}
+
+.fu-ace-vanguard-slot.has-card {
+  cursor: pointer;
+  border-style: solid;
+  border-color: #c084fc;
+}
+
+.fu-ace-vanguard-slot.has-card:hover {
+  box-shadow: 0 0 10px rgba(192, 132, 252, 0.7);
+}
+
+.fu-ace-vanguard-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.75;
+  border: none;
+}
+
+.fu-ace-vanguard-slot.has-card span {
+  position: absolute;
+  background: rgba(2, 6, 23, 0.82);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #f3e8ff;
+  font-weight: 700;
+}
+
+/* Banner de Detecção de Conjunto */
+.fu-ace-combo-banner {
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.fu-ace-combo-banner.has-combo {
+  background: rgba(14, 116, 144, 0.32);
+  border-color: rgba(56, 189, 248, 0.65);
+  color: #f0f9ff;
+}
+
+.fu-ace-combo-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #7dd3fc;
+}
+
+.fu-ace-combo-desc {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: #e2e8f0;
+}
+
+.fu-ace-combo-opts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.fu-ace-chip {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: #e2e8f0;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.fu-ace-chip.is-active {
+  background: rgba(14, 165, 233, 0.35);
+  border-color: #38bdf8;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Grid de Botões de Ação */
+.fu-ace-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.fu-ace-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.1s ease;
+}
+
+.fu-ace-btn:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.9);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.fu-ace-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fu-ace-btn.is-primary {
+  background: rgba(6, 95, 70, 0.68);
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #ecfdf5;
+}
+
+.fu-ace-btn.is-accent {
+  background: rgba(3, 105, 161, 0.72);
+  border-color: rgba(56, 189, 248, 0.65);
+  color: #f0f9ff;
+}
+
+.fu-ace-btn.is-danger {
+  background: rgba(127, 29, 29, 0.65);
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fef2f2;
+}
+
+.fu-ace-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.fu-ace-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.fu-ace-spectator-note {
+  font-size: 11.5px;
+  color: #94a3b8;
+  text-align: center;
+  padding: 4px;
+}
+
+/* Gaveta da Pilha de Descarte */
+.fu-ace-discard-drawer {
+  border-top: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 8px 12px 10px;
+  background: rgba(9, 11, 20, 0.78);
+  border-radius: 0 0 12px 12px;
+}
+
+.fu-ace-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  margin-bottom: 6px;
+  color: #7dd3fc;
+}
+
+.fu-ace-drawer-head button {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.fu-ace-drawer-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.fu-ace-mini-card {
+  position: relative;
+  width: 48px;
+  height: 68px;
+  flex-shrink: 0;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+}
+
+.fu-ace-mini-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: none;
+}
+
+.fu-ace-mini-card span {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  background: rgba(2, 6, 23, 0.85);
+  font-size: 9px;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+/* Estilo das Mensagens no Chat */
+.fu-ace-chat-card {
+  background: linear-gradient(180deg, #131626 0%, #0c0e18 100%);
+  border: 1px solid #38bdf8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #f1f5f9;
+  font-family: "Signika", sans-serif;
+}
+
+.fu-ace-chat-header {
+  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.fu-ace-chat-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+.fu-ace-chat-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.fu-ace-chat-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.fu-ace-chat-pill {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid #38bdf8;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fu-ace-chat-body {
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.fu-ace-chat-subblock {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.3);
+  font-size: 11.5px;
+  color: #cbd5e1;
+}
+
+.fu-ace-chat-footer {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 11.5px;
+}
