@@ -16,11 +16,11 @@
 .fu-ace-modal {
   position: fixed;
   z-index: 120;
-  width: 690px;
+  width: 720px;
   max-width: calc(100vw - 32px);
   display: none;
   flex-direction: column;
-  background: rgba(24, 10, 14, 0.68);
+  background: rgba(24, 10, 14, 0.72);
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
   border: 1px solid rgba(212, 175, 55, 0.55);
@@ -28,20 +28,21 @@
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.72), inset 0 0 22px rgba(185, 28, 28, 0.16);
   color: #fef3c7;
   font-family: "Signika", sans-serif;
+  font-size: 13.5px;
   user-select: none;
   transition: width 0.16s ease;
 }
 
 .fu-ace-modal.is-minimized {
-  width: 340px;
+  width: 360px;
 }
 
 .fu-ace-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: linear-gradient(90deg, rgba(69, 10, 10, 0.85) 0%, rgba(36, 12, 16, 0.88) 100%);
+  padding: 9px 13px;
+  background: linear-gradient(90deg, rgba(69, 10, 10, 0.88) 0%, rgba(36, 12, 16, 0.9) 100%);
   border-bottom: 1px solid rgba(212, 175, 55, 0.45);
   border-radius: 12px 12px 0 0;
   cursor: move;
@@ -51,7 +52,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: #fef3c7;
 }
 
@@ -60,28 +61,28 @@
 }
 
 .fu-ace-mp-badge {
-  background: rgba(185, 28, 28, 0.35);
-  border: 1px solid rgba(251, 191, 36, 0.6);
+  background: rgba(185, 28, 28, 0.38);
+  border: 1px solid rgba(251, 191, 36, 0.65);
   color: #fde68a;
-  padding: 1px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .fu-ace-readonly-badge {
-  background: rgba(217, 119, 6, 0.25);
+  background: rgba(217, 119, 6, 0.28);
   border: 1px solid rgba(251, 191, 36, 0.5);
   color: #fcd34d;
-  padding: 1px 7px;
+  padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .fu-ace-win-btns {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
 }
 
 .fu-ace-win-btns button {
@@ -89,8 +90,8 @@
   border: none;
   color: #fcd34d;
   cursor: pointer;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 4px;
   display: inline-flex;
   align-items: center;
@@ -104,44 +105,44 @@
 
 /* Barra Compacta (Modo Minimizado estilo Mini Calendar) */
 .fu-ace-minimized-body {
-  padding: 7px 10px;
+  padding: 8px 11px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .fu-ace-min-stats {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: #fde68a;
 }
 
 .fu-ace-min-stats span i {
   color: #f87171;
-  margin-right: 3px;
+  margin-right: 4px;
 }
 
 .fu-ace-min-draw {
-  background: rgba(185, 28, 28, 0.65);
+  background: rgba(185, 28, 28, 0.7);
   border: 1px solid #fbbf24;
   color: #fef3c7;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 5px;
   cursor: pointer;
 }
 
 .fu-ace-min-draw:hover {
-  background: rgba(220, 38, 38, 0.85);
+  background: rgba(220, 38, 38, 0.9);
 }
 
 .fu-ace-min-hand {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
 }
 
 .fu-ace-mini-pill {
@@ -149,8 +150,8 @@
   color: #7f1d1d;
   border: 1px solid #d4af37;
   border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 11.5px;
+  padding: 1px 7px;
+  font-size: 12.5px;
   font-weight: 800;
 }
 
@@ -168,15 +169,15 @@
 .fu-ace-body {
   display: flex;
   gap: 14px;
-  padding: 12px;
+  padding: 13px;
 }
 
 /* Pilhas à Esquerda (Baralho e Descarte) */
 .fu-ace-piles-col {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: 96px;
+  gap: 11px;
+  width: 98px;
   flex-shrink: 0;
 }
 
@@ -184,16 +185,16 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .fu-ace-pile-card {
   position: relative;
-  width: 86px;
-  height: 124px;
+  width: 88px;
+  height: 126px;
   border-radius: 8px;
   border: 1px solid rgba(212, 175, 55, 0.5);
-  background: rgba(34, 12, 16, 0.72);
+  background: rgba(34, 12, 16, 0.75);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -219,7 +220,7 @@
 }
 
 .fu-ace-pile-empty {
-  font-size: 11px;
+  font-size: 12px;
   color: #d6a2a2;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -229,17 +230,17 @@
   position: absolute;
   bottom: 4px;
   right: 4px;
-  background: rgba(42, 10, 14, 0.92);
+  background: rgba(42, 10, 14, 0.94);
   border: 1px solid #fbbf24;
   color: #fbbf24;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 800;
-  padding: 1px 7px;
+  padding: 1px 8px;
   border-radius: 999px;
 }
 
 .fu-ace-pile-label {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: #fde68a;
   font-weight: 600;
 }
@@ -258,9 +259,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 156px;
-  padding: 10px 6px 4px;
-  background: rgba(38, 12, 16, 0.42);
+  min-height: 162px;
+  padding: 10px 6px 6px;
+  background: rgba(38, 12, 16, 0.44);
   border: 1px dashed rgba(212, 175, 55, 0.35);
   border-radius: 8px;
 }
@@ -270,25 +271,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 146px;
+  height: 150px;
   padding: 0 16px;
 }
 
 .fu-ace-empty-hand {
-  font-size: 12px;
+  font-size: 13px;
   color: #f3d1d1;
   text-align: center;
 }
 
 .fu-ace-card {
   position: relative;
-  width: 94px;
-  height: 136px;
-  margin-left: -22px;
+  width: 96px;
+  height: 140px;
+  margin-left: -20px;
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid rgba(212, 175, 55, 0.55);
+  border: 2px solid rgba(212, 175, 55, 0.58);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.68);
   transform: translateY(var(--fan-y, 0px)) rotate(var(--fan-angle, 0deg));
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
@@ -297,6 +298,21 @@
 
 .fu-ace-card:first-child {
   margin-left: 0;
+}
+
+/* Neon Dourado ao redor de qualquer Curinga */
+@keyframes fuAceJokerPulse {
+  0%, 100% {
+    box-shadow: 0 0 12px #fbbf24, 0 0 22px rgba(245, 158, 11, 0.85), inset 0 0 8px rgba(251, 191, 36, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 18px #fde047, 0 0 32px rgba(251, 191, 36, 1), inset 0 0 12px rgba(253, 224, 71, 0.75);
+  }
+}
+
+.fu-ace-card.is-joker-card {
+  border: 2px solid #fde047;
+  animation: fuAceJokerPulse 2.2s ease-in-out infinite;
 }
 
 .fu-ace-card:hover {
@@ -309,7 +325,8 @@
 .fu-ace-card.is-selected {
   transform: translateY(-18px) rotate(0deg) scale(1.08);
   border-color: #ef4444;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.95), 0 0 8px #fbbf24;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.95), 0 0 10px #fbbf24;
+  animation: none;
 }
 
 .fu-ace-card img {
@@ -320,21 +337,28 @@
   pointer-events: none;
 }
 
-/* Badge ampliada de número e naipe na carta */
-.fu-ace-card-tag {
+/* Canto Superior Esquerdo: Número/Naipe + Ícone Elemental abaixo */
+.fu-ace-card-corner {
   position: absolute;
   top: 4px;
   left: 4px;
-  background: rgba(24, 8, 12, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.fu-ace-card-tag {
+  background: rgba(24, 8, 12, 0.94);
   border: 1px solid #d4af37;
   color: #fbbf24;
-  font-size: 14px;
-  line-height: 1.1;
+  font-size: 16px;
+  line-height: 1.05;
   font-weight: 800;
   padding: 2px 7px;
   border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.65);
-  pointer-events: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
 }
 
 .fu-ace-card-tag.suit-hearts,
@@ -349,7 +373,27 @@
 
 .fu-ace-card-tag.is-joker {
   background: #7f1d1d;
-  color: #fbbf24;
+  color: #fde047;
+  border-color: #fde047;
+}
+
+.fu-ace-card-elem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  background: rgba(24, 8, 12, 0.92);
+  border: 1px solid rgba(212, 175, 55, 0.75);
+  border-radius: 4px;
+  font-size: 11.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.65);
+}
+
+.fu-ace-card-elem.is-joker {
+  color: #fde047;
+  border-color: #fde047;
+  background: rgba(127, 29, 29, 0.95);
 }
 
 /* Vanguarda de Cartas (2 slots) */
@@ -357,13 +401,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 66px;
+  width: 72px;
   flex-shrink: 0;
 }
 
 .fu-ace-vanguard-slot {
   position: relative;
-  height: 66px;
+  height: 68px;
   border-radius: 6px;
   border: 1px dashed rgba(212, 175, 55, 0.45);
   background: rgba(55, 14, 20, 0.42);
@@ -371,7 +415,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   color: #fde68a;
   overflow: hidden;
 }
@@ -406,16 +450,16 @@
 
 /* Banner de Detecção de Conjunto */
 .fu-ace-combo-banner {
-  padding: 7px 10px;
+  padding: 8px 11px;
   border-radius: 7px;
-  background: rgba(34, 12, 16, 0.72);
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  font-size: 12px;
+  background: rgba(34, 12, 16, 0.75);
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  font-size: 13px;
   color: #f3d1d1;
 }
 
 .fu-ace-combo-banner.has-combo {
-  background: linear-gradient(90deg, rgba(127, 29, 29, 0.55) 0%, rgba(120, 53, 15, 0.45) 100%);
+  background: linear-gradient(90deg, rgba(127, 29, 29, 0.58) 0%, rgba(120, 53, 15, 0.48) 100%);
   border-color: #fbbf24;
   color: #fef3c7;
 }
@@ -424,13 +468,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
   color: #fbbf24;
 }
 
 .fu-ace-combo-desc {
-  margin-top: 2px;
-  font-size: 11.5px;
+  margin-top: 3px;
+  font-size: 12.5px;
   color: #fffbeb;
 }
 
@@ -438,22 +482,22 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 6px;
+  gap: 6px;
+  margin-top: 7px;
 }
 
 .fu-ace-chip {
   background: rgba(34, 12, 16, 0.9);
   border: 1px solid rgba(212, 175, 55, 0.45);
   color: #fde68a;
-  font-size: 11px;
-  padding: 2px 8px;
+  font-size: 12px;
+  padding: 2px 9px;
   border-radius: 999px;
   cursor: pointer;
 }
 
 .fu-ace-chip.is-active {
-  background: rgba(185, 28, 28, 0.75);
+  background: rgba(185, 28, 28, 0.78);
   border-color: #fbbf24;
   color: #ffffff;
   font-weight: 700;
@@ -463,7 +507,7 @@
 .fu-ace-actions-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 7px;
 }
 
 .fu-ace-btn {
@@ -471,20 +515,20 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 8px;
-  font-size: 11.5px;
+  padding: 7px 9px;
+  font-size: 12.5px;
   font-weight: 600;
   color: #fef3c7;
-  background: rgba(45, 16, 22, 0.82);
-  border: 1px solid rgba(212, 175, 55, 0.38);
+  background: rgba(45, 16, 22, 0.85);
+  border: 1px solid rgba(212, 175, 55, 0.4);
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.14s ease, border-color 0.14s ease, transform 0.1s ease;
 }
 
 .fu-ace-btn-icon {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   object-fit: cover;
   border-radius: 3px;
   border: 1px solid rgba(212, 175, 55, 0.5);
@@ -492,7 +536,7 @@
 }
 
 .fu-ace-btn:hover:not(:disabled) {
-  background: rgba(127, 29, 29, 0.88);
+  background: rgba(127, 29, 29, 0.9);
   border-color: #fbbf24;
   color: #ffffff;
 }
@@ -503,20 +547,20 @@
 }
 
 .fu-ace-btn.is-primary {
-  background: linear-gradient(180deg, rgba(146, 64, 14, 0.85) 0%, rgba(120, 53, 15, 0.9) 100%);
+  background: linear-gradient(180deg, rgba(146, 64, 14, 0.88) 0%, rgba(120, 53, 15, 0.92) 100%);
   border-color: #fbbf24;
   color: #fffbeb;
 }
 
 .fu-ace-btn.is-accent {
-  background: linear-gradient(180deg, rgba(185, 28, 28, 0.85) 0%, rgba(127, 29, 29, 0.92) 100%);
+  background: linear-gradient(180deg, rgba(185, 28, 28, 0.88) 0%, rgba(127, 29, 29, 0.94) 100%);
   border-color: #fbbf24;
   color: #fffbeb;
 }
 
 .fu-ace-btn.is-danger {
-  background: rgba(88, 12, 18, 0.85);
-  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(88, 12, 18, 0.88);
+  border-color: rgba(248, 113, 113, 0.58);
   color: #fecaca;
 }
 
@@ -524,7 +568,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   color: #fde68a;
 }
 
@@ -540,13 +584,13 @@
 }
 
 .fu-ace-spectator-note {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: #f3d1d1;
   text-align: center;
   padding: 4px;
 }
 
-/* Sub-modal Estilizado para Declarar Naipe (Carta Armadilha - Fundo) */
+/* Sub-modal Estilizado para Declarar Naipe (Carta Armadilha) */
 .fu-ace-submodal-backdrop {
   position: absolute;
   inset: 0;
@@ -562,7 +606,7 @@
 
 .fu-ace-submodal {
   width: 100%;
-  max-width: 440px;
+  max-width: 450px;
   background: linear-gradient(180deg, #2b0d12 0%, #17070a 100%);
   border: 1px solid #fbbf24;
   border-radius: 10px;
@@ -574,10 +618,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: rgba(69, 10, 10, 0.9);
+  padding: 9px 13px;
+  background: rgba(69, 10, 10, 0.92);
   border-bottom: 1px solid rgba(251, 191, 36, 0.45);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: #fbbf24;
 }
@@ -596,9 +640,9 @@
 }
 
 .fu-ace-submodal-text {
-  padding: 10px 12px 6px;
+  padding: 10px 13px 6px;
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: #fef3c7;
 }
 
@@ -606,7 +650,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  padding: 8px 12px 12px;
+  padding: 8px 13px 13px;
 }
 
 .fu-ace-suit-choice {
@@ -614,8 +658,8 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 4px;
-  background: rgba(45, 16, 22, 0.9);
+  padding: 9px 4px;
+  background: rgba(45, 16, 22, 0.92);
   border: 1px solid rgba(212, 175, 55, 0.5);
   border-radius: 8px;
   cursor: pointer;
@@ -624,31 +668,31 @@
 
 .fu-ace-suit-choice:hover {
   transform: translateY(-2px);
-  background: rgba(153, 27, 27, 0.85);
+  background: rgba(153, 27, 27, 0.88);
   border-color: #fbbf24;
 }
 
 .fu-ace-suit-sym {
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1.1;
 }
 
 .fu-ace-suit-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: #fffbeb;
 }
 
 .fu-ace-suit-elem {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: #fde68a;
 }
 
 /* Gaveta da Pilha de Descarte */
 .fu-ace-discard-drawer {
   border-top: 1px solid rgba(212, 175, 55, 0.4);
-  padding: 8px 12px 10px;
-  background: rgba(22, 8, 12, 0.88);
+  padding: 9px 13px 11px;
+  background: rgba(22, 8, 12, 0.9);
   border-radius: 0 0 12px 12px;
 }
 
@@ -656,7 +700,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11.5px;
+  font-size: 12.5px;
   margin-bottom: 6px;
   color: #fbbf24;
 }
@@ -677,8 +721,8 @@
 
 .fu-ace-mini-card {
   position: relative;
-  width: 48px;
-  height: 68px;
+  width: 50px;
+  height: 70px;
   flex-shrink: 0;
   border-radius: 5px;
   overflow: hidden;
@@ -697,9 +741,9 @@
   position: absolute;
   bottom: 1px;
   right: 2px;
-  background: rgba(24, 8, 12, 0.9);
+  background: rgba(24, 8, 12, 0.92);
   color: #fbbf24;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   padding: 0 4px;
   border-radius: 3px;
@@ -710,7 +754,7 @@
   background: linear-gradient(180deg, #270b10 0%, #140609 100%);
   border: 1px solid #d4af37;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 9px 11px;
   color: #fef3c7;
   font-family: "Signika", sans-serif;
   box-shadow: inset 0 0 12px rgba(185, 28, 28, 0.25);
@@ -718,26 +762,26 @@
 
 .fu-ace-chat-header {
   border-bottom: 1px solid rgba(212, 175, 55, 0.4);
-  padding-bottom: 4px;
-  margin-bottom: 6px;
+  padding-bottom: 5px;
+  margin-bottom: 7px;
 }
 
 .fu-ace-chat-title {
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 700;
   color: #fbbf24;
 }
 
 .fu-ace-chat-sub {
-  font-size: 11px;
+  font-size: 11.5px;
   color: #f3d1d1;
 }
 
 .fu-ace-chat-cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 5px;
+  margin-bottom: 7px;
 }
 
 .fu-ace-chat-pill {
@@ -748,7 +792,7 @@
   border: 1px solid #d4af37;
   border-radius: 999px;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   color: #fffbeb;
 }
@@ -759,7 +803,7 @@
 }
 
 .fu-ace-chat-body {
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.45;
   color: #fef3c7;
 }
@@ -768,12 +812,12 @@
   margin-top: 6px;
   padding-top: 5px;
   border-top: 1px dashed rgba(212, 175, 55, 0.35);
-  font-size: 11.5px;
+  font-size: 12px;
   color: #fde68a;
 }
 
 .fu-ace-chat-footer {
   margin-top: 6px;
   text-align: right;
-  font-size: 11.5px;
+  font-size: 12px;
 }
