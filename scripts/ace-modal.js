@@ -12,6 +12,7 @@ import {
 
 const STORAGE_POS_KEY = `${MODULE_ID}.modalPosition`;
 const STORAGE_MIN_KEY = `${MODULE_ID}.modalMinimized`;
+const DECK_ICON = "icons/sundries/gaming/playing-cards.webp";
 
 export class AceOfCardsModal {
   constructor() {
@@ -69,7 +70,7 @@ export class AceOfCardsModal {
 
   getSkillIcon(actor, fuid) {
     const item = actor?.items?.find(i => i.system?.fuid === fuid);
-    return item?.img || SKILL_DEFAULT_ICONS[fuid] || "icons/sundries/gaming/playing-cards.webp";
+    return item?.img || SKILL_DEFAULT_ICONS[fuid] || DECK_ICON;
   }
 
   getState() {
@@ -109,10 +110,6 @@ export class AceOfCardsModal {
     return copy;
   }
 
-  /**
-   * Compra cartas e as insere na ponta esquerda da mão (índice 0),
-   * empurrando as cartas anteriores para a direita.
-   */
   drawFromDeck(state, count, insertLeft = true) {
     let reshuffled = false;
     const drawnCards = [];
@@ -229,34 +226,58 @@ export class AceOfCardsModal {
     });
   }
 
-  formatCardPillHtml(card) {
+  formatNativeCardTagHtml(card) {
     if (card.isJoker) {
-      return `<span class="fu-ace-chat-pill is-joker">★ ${card.name}</span>`;
+      return `<div class="fu-tag fu-ace-native-card-tag is-joker">★ ${card.name}</div>`;
     }
     const suit = SUITS[card.suit];
     const numLabel = card.value === 1 ? "Ás" : card.value;
     return `
-      <span class="fu-ace-chat-pill" style="border-color:${suit.color}">
-        ${numLabel} de ${suit.name} @ICON[${suit.fuSuitIcon}] (@ICON[${suit.element}] ${suit.elementLabel})
-      </span>
+      <div class="fu-tag fu-ace-native-card-tag">
+        ${numLabel} de ${suit.name} @ICON[${suit.fuSuitIcon}] • @ICON[${suit.element}] ${suit.elementLabel}
+      </div>
     `;
   }
 
-  async postChatCard({ title, subtitle, bodyHtml, cards = [], footerHtml = "" }) {
+  /**
+   * Publica mensagem no chat seguindo exatamente a estrutura nativa do sistema Project FU.
+   */
+  async postChatCard({ title, icon = DECK_ICON, tags = [], bodyHtml, cards = [], footerHtml = "" }) {
     const actor = this.getAceActor();
+
+    const tagsHtml = tags.length
+      ? `<div data-order="-3000">
+           <div class="pfu-chat-message__toggle-section pfu-tags">
+             ${tags.map(t => `<div class="fu-tag" data-tooltip="">${t}</div>`).join("")}
+           </div>
+         </div>`
+      : "";
+
     const cardsHtml = cards.length
-      ? `<div class="fu-ace-chat-cards">${cards.map(c => this.formatCardPillHtml(c)).join("")}</div>`
+      ? `<div data-order="-2500">
+           <div class="pfu-chat-message__toggle-section pfu-tags">
+             ${cards.map(c => this.formatNativeCardTagHtml(c)).join("")}
+           </div>
+         </div>`
       : "";
 
     const content = `
-      <div class="fu-ace-chat-card">
-        <div class="fu-ace-chat-header">
-          <div class="fu-ace-chat-title">${title}</div>
-          ${subtitle ? `<div class="fu-ace-chat-sub">${subtitle}</div>` : ""}
+      <div class="fu-ace-pfu-msg">
+        <div class="fu-ace-pfu-header">
+          <img class="fu-ace-pfu-header__icon" src="${icon}" alt="${title}" />
+          <span class="fu-ace-pfu-header__title">${title}</span>
         </div>
+        ${tagsHtml}
         ${cardsHtml}
-        <div class="fu-ace-chat-body">${bodyHtml}</div>
-        ${footerHtml ? `<div class="fu-ace-chat-footer">${footerHtml}</div>` : ""}
+        <div data-order="-2000">
+          <div class="pfu-chat-message__toggle-section description chat-desc">
+            <details open="">
+              <summary class="collapsible-description align-center">Descrição</summary>
+              ${bodyHtml}
+            </details>
+          </div>
+        </div>
+        ${footerHtml ? `<div data-order="2500">${footerHtml}</div>` : ""}
       </div>
     `;
 
@@ -287,9 +308,10 @@ export class AceOfCardsModal {
     await this.saveState(state);
 
     await this.postChatCard({
-      title: "Início de Conflito — Baralho Embaralhado",
-      subtitle: "30 cartas embaralhadas • 5 cartas compradas para a mão inicial",
-      bodyHtml: `<p>O baralho do destino foi embaralhado e <strong>5 cartas</strong> foram puxadas.</p>`
+      title: "Início de Conflito",
+      icon: DECK_ICON,
+      tags: ["Classe: Carteador", "Baralho: 25/30", "Mão: 5"],
+      bodyHtml: `<p>O baralho do destino de <strong>30 cartas</strong> foi embaralhado e <strong>5 cartas</strong> foram puxadas para a mão inicial.</p>`
     });
   }
 
@@ -305,9 +327,10 @@ export class AceOfCardsModal {
     await this.saveState(state);
 
     await this.postChatCard({
-      title: "Fim de Conflito — Baralho Recolhido",
-      subtitle: "Mão, descarte e vanguarda devolvidos ao baralho (30 cartas)",
-      bodyHtml: `<p>Todas as 30 cartas foram embaralhadas de volta ao baralho.</p>`
+      title: "Fim de Conflito",
+      icon: DECK_ICON,
+      tags: ["Classe: Carteador", "Baralho: 30/30"],
+      bodyHtml: `<p>Mão, descarte e vanguarda foram recolhidos e embaralhados de volta ao baralho (<strong>30 cartas</strong>).</p>`
     });
   }
 
@@ -327,10 +350,16 @@ export class AceOfCardsModal {
     await this.saveState(state);
 
     await this.postChatCard({
-      title: `Comprou ${drawn} Carta${drawn > 1 ? "s" : ""}`,
-      subtitle: `Baralho: ${state.deck.length} | Mão: ${state.hand.length} | Descarte: ${state.discard.length}`,
+      title: `Comprar Carta${drawn > 1 ? "s" : ""}`,
+      icon: DECK_ICON,
+      tags: [
+        "Classe: Carteador",
+        `Baralho: ${state.deck.length}`,
+        `Mão: ${state.hand.length}`,
+        `Descarte: ${state.discard.length}`
+      ],
       bodyHtml: reshuffled
-        ? `<p>A pilha de descarte foi reembaralhada para formar um novo baralho antes de completar a compra.</p>`
+        ? `<p>A pilha de descarte foi reembaralhada para formar um novo baralho antes de comprar <strong>${drawn}</strong> carta(s).</p>`
         : `<p>Comprou <strong>${drawn}</strong> carta(s) do topo do baralho.</p>`
     });
   }
@@ -341,13 +370,14 @@ export class AceOfCardsModal {
     await this.saveState(state);
 
     await this.postChatCard({
-      title: "Baralho Embaralhado",
-      subtitle: `${state.deck.length} cartas restantes no baralho`,
-      bodyHtml: `<p>As cartas restantes no baralho foram embaralhadas.</p>`
+      title: "Embaralhar",
+      icon: DECK_ICON,
+      tags: ["Classe: Carteador", `Baralho: ${state.deck.length}`],
+      bodyHtml: `<p>As <strong>${state.deck.length}</strong> cartas restantes no baralho foram embaralhadas.</p>`
     });
   }
 
-  async actionDiscardSelected(reason = "Descarte Manual") {
+  async actionDiscardSelected(reason = "Descartar Cartas") {
     const state = this.getState();
     const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
     if (!selected.length) {
@@ -362,9 +392,10 @@ export class AceOfCardsModal {
 
     await this.postChatCard({
       title: reason,
-      subtitle: `${selected.length} carta(s) enviada(s) para a pilha de descarte`,
+      icon: DECK_ICON,
+      tags: ["Classe: Carteador", `${selected.length} Carta(s)`, `Descarte: ${state.discard.length}`],
       cards: selected,
-      bodyHtml: `<p>Cartas colocadas com a face para cima no topo da pilha de descarte.</p>`
+      bodyHtml: `<p>Colocou <strong>${selected.length}</strong> carta(s) com a face para cima no topo da pilha de descarte.</p>`
     });
   }
 
@@ -385,11 +416,12 @@ export class AceOfCardsModal {
     this.selectedHandIds.clear();
     await this.saveState(state);
 
-    const posLabel = position === "top" ? "topo" : "fundo";
+    const posLabel = position === "top" ? "Topo do Baralho" : "Fundo do Baralho";
     await this.postChatCard({
-      title: `Cartas Movidas para o ${posLabel.toUpperCase()} do Baralho`,
-      subtitle: `${selected.length} carta(s) devolvida(s) com face para baixo`,
-      bodyHtml: `<p><strong>${selected.length}</strong> carta(s) da mão foram colocadas no <strong>${posLabel}</strong> do baralho.</p>`
+      title: posLabel,
+      icon: DECK_ICON,
+      tags: ["Classe: Carteador", `${selected.length} Carta(s)`, `Baralho: ${state.deck.length}`],
+      bodyHtml: `<p>Devolveu <strong>${selected.length}</strong> carta(s) da mão com a face para baixo no <strong>${posLabel.toLowerCase()}</strong>.</p>`
     });
   }
 
@@ -443,7 +475,7 @@ export class AceOfCardsModal {
     this.selectedHandIds.clear();
     await this.saveState(state);
 
-    let effectBlock = `<p><strong>Sem conjunto válido:</strong> cartas resolvidas individualmente.</p>`;
+    let effectBlock = `<p><strong>Conjunto Livre:</strong> cartas resolvidas individualmente.</p>`;
     if (combo) {
       const chosenSuitKey =
         this.chosenElement && combo.uniqueSuits.includes(this.chosenElement)
@@ -485,15 +517,33 @@ export class AceOfCardsModal {
       }
     }
 
+    const actorUuid = actor?.uuid || "";
+    const footerHtml = this.spendMpAuto
+      ? `<div class="pfu-tags flexrow gap-5">
+           <span class="fu-tag button flex-group-center gap-5 fu-target-action__icon__container" style="width:100%;white-space:nowrap;cursor:default;">
+             ${mpCost} PM Descontados da Ficha
+             <i class="fu-icon fu-mp fu-target-action__icon"></i>
+           </span>
+         </div>`
+      : `<div class="pfu-tags flexrow gap-5">
+           <a data-action="applyResourceLoss" data-name="Cartas Mágicas" data-actor="${actorUuid}" data-resource="mp" data-tooltip="Clique para gastar o recurso fornecido no personagem que executou esta ação." data-amount="${mpCost}">
+             <span class="fu-tag button flex-group-center gap-5 fu-target-action__icon__container" style="width:100%;white-space:nowrap">
+               Gastar ${mpCost} PM
+               <i class="fu-icon fu-mp fu-target-action__icon"></i>
+             </span>
+           </a>
+         </div>`;
+
     await this.postChatCard({
       title: `Cartas Mágicas — ${combo ? combo.name : "Conjunto Livre"}`,
-      subtitle: `Custo: ${mpCost} PM • ${selected.length} carta(s) descartada(s)`,
+      icon: this.getSkillIcon(actor, "magic-cards"),
+      tags: ["Classe: Carteador", `NP ${magicCardsNP}`, "Poder", `${mpCost} PM`],
       cards: selected,
       bodyHtml: `
         ${effectBlock}
-        <div class="fu-ace-chat-subblock">${highLowNotes.join("<br>")}</div>
+        <p class="fu-ace-pfu-subnote">${highLowNotes.join("<br>")}</p>
       `,
-      footerHtml: `@LOSS[${mpCost} mp]`
+      footerHtml
     });
   }
 
@@ -514,10 +564,11 @@ export class AceOfCardsModal {
     await this.saveState(state);
 
     await this.postChatCard({
-      title: `Mulligan (NP ${mulliganNP})`,
-      subtitle: `Descartou ${selected.length} carta(s) da mão`,
+      title: "Mulligan",
+      icon: this.getSkillIcon(actor, "mulligan"),
+      tags: ["Classe: Carteador", `NP ${mulliganNP}`, "Poder", `${selected.length} Carta(s)`],
       cards: selected,
-      bodyHtml: `<p>Descartou <strong>${selected.length}</strong> carta(s) da mão (compre ${selected.length} carta(s) usando <strong>Comprar 1</strong>).</p>`
+      bodyHtml: `<p>Descartou <strong>${selected.length}</strong> carta(s) da mão (compre <strong>${selected.length}</strong> carta(s) usando <strong>Comprar 1</strong>).</p>`
     });
   }
 
@@ -542,16 +593,23 @@ export class AceOfCardsModal {
     const success = bottomCard.isJoker || bottomCard.suit === declaredSuitKey;
 
     await this.postChatCard({
-      title: `Carta Armadilha — Fundo do Baralho`,
-      subtitle: `Naipe declarado: ${declaredSuit.name} @ICON[${declaredSuit.fuSuitIcon}] (@ICON[${declaredSuit.element}] ${declaredSuit.elementLabel})`,
+      title: "Carta Armadilha",
+      icon: this.getSkillIcon(actor, "trap-card"),
+      tags: [
+        "Classe: Carteador",
+        `NP ${trapNP}`,
+        "Poder",
+        `Declarado: ${declaredSuit.name} @ICON[${declaredSuit.fuSuitIcon}]`
+      ],
       cards: [bottomCard],
       bodyHtml: success
-        ? `<p><strong>SUCESSO!</strong> A carta do fundo era <strong>${bottomCard.name}</strong>. Você pode lançar um <strong>Feitiço</strong> de graça com custo até <strong>${maxSpellMp} PM</strong>!</p>`
-        : `<p><strong>Falhou:</strong> A carta do fundo era <strong>${bottomCard.name}</strong> (não corresponde a ${declaredSuit.name} @ICON[${declaredSuit.fuSuitIcon}]).</p>`
+        ? `<p><strong>SUCESSO!</strong> A carta do fundo do baralho era <strong>${bottomCard.name}</strong>. Você pode lançar um <strong>Feitiço</strong> gratuitamente com custo total de até <strong>${maxSpellMp} PM</strong>!</p>`
+        : `<p><strong>Falhou:</strong> A carta do fundo do baralho era <strong>${bottomCard.name}</strong> (não corresponde ao naipe declarado de <strong>${declaredSuit.name}</strong> @ICON[${declaredSuit.fuSuitIcon}]).</p>`
     });
   }
 
   async actionHighOrLowSwap() {
+    const actor = this.getAceActor();
     const state = this.getState();
     const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
     if (selected.length !== 1) {
@@ -559,28 +617,35 @@ export class AceOfCardsModal {
       return;
     }
 
+    const highLowNP = this.getSkillNP(actor, "high-or-low", 1);
     state.hand = state.hand.filter(c => c.id !== selected[0].id);
     state.discard.push(selected[0]);
     this.selectedHandIds.clear();
     await this.saveState(state);
 
     await this.postChatCard({
-      title: "Altos e Baixos — Descarte Crítico",
-      subtitle: "Descartou 1 carta da mão",
+      title: "Altos e Baixos",
+      icon: this.getSkillIcon(actor, "high-or-low"),
+      tags: ["Classe: Carteador", `NP ${highLowNP}`, "Poder"],
       cards: selected,
       bodyHtml: `<p>Descartou <strong>${selected[0].name}</strong> da mão por <strong>Altos e Baixos</strong> (use <strong>Comprar 1</strong> para puxar sua carta).</p>`
     });
   }
 
   async actionDoubleOrNothing() {
+    const actor = this.getAceActor();
+    const doubleNP = this.getSkillNP(actor, "double-or-nothing", 1);
+
     await this.postChatCard({
-      title: "Dobro ou Nada!",
-      subtitle: "Declaração antes do Teste",
+      title: "Dobro ou Nada",
+      icon: this.getSkillIcon(actor, "double-or-nothing"),
+      tags: ["Classe: Carteador", `NP ${doubleNP}`, "Poder"],
       bodyHtml: `<p>O Carteador declarou <strong>Dobro ou Nada</strong> antes da rolagem! Dados com resultado <strong>par</strong> têm seu valor dobrado; dados <strong>ímpares</strong> contam como <strong>1</strong>.</p>`
     });
   }
 
   async actionPlaceVanguard() {
+    const actor = this.getAceActor();
     const state = this.getState();
     if (state.vanguard.length >= 2) {
       ui.notifications.warn("Você já possui o máximo de 2 cartas de vanguarda em jogo.");
@@ -599,12 +664,14 @@ export class AceOfCardsModal {
 
     await this.postChatCard({
       title: "Vanguarda de Cartas",
-      subtitle: `Baixou 1 carta virada para baixo (${state.vanguard.length}/2 em jogo)`,
-      bodyHtml: `<p>Uma carta foi posicionada com a face para baixo na <strong>Vanguarda</strong> (use <strong>Comprar 1</strong> para puxar 1 carta).</p>`
+      icon: this.getSkillIcon(actor, "card-vanguard"),
+      tags: ["Classe: Carteador", "Poder", `Em Jogo: ${state.vanguard.length}/2`],
+      bodyHtml: `<p>Baixou <strong>1 carta com a face para baixo</strong> na Vanguarda (use <strong>Comprar 1</strong> para puxar 1 carta).</p>`
     });
   }
 
   async actionRevealVanguard(index) {
+    const actor = this.getAceActor();
     const state = this.getState();
     const card = state.vanguard[index];
     if (!card) return;
@@ -618,8 +685,9 @@ export class AceOfCardsModal {
       : `naipe de <strong>${SUITS[card.suit].name}</strong> @ICON[${SUITS[card.suit].fuSuitIcon}] (@ICON[${SUITS[card.suit].element}] ${SUITS[card.suit].elementLabel})`;
 
     await this.postChatCard({
-      title: "Vanguarda de Cartas Revelada!",
-      subtitle: "Carta enviada ao topo da pilha de descarte",
+      title: "Vanguarda de Cartas Revelada",
+      icon: this.getSkillIcon(actor, "card-vanguard"),
+      tags: ["Classe: Carteador", "Poder", `Em Jogo: ${state.vanguard.length}/2`],
       cards: [card],
       bodyHtml: `<p>Revelou <strong>${card.name}</strong> (${elemText}). Se corresponder ao tipo de dano sofrido, você <strong>não sofre o dano</strong> e recupera essa mesma quantidade em <strong>PM</strong>!</p>`
     });
@@ -635,7 +703,6 @@ export class AceOfCardsModal {
 
     const transitionsToRestore = [];
 
-    // 1. FLIP nas cartas antigas para deslizarem suavemente para a direita
     for (const el of cardEls) {
       const id = el.dataset.cardId;
       if (newCardIds.has(id)) continue;
@@ -654,7 +721,6 @@ export class AceOfCardsModal {
       }
     }
 
-    // 2. Cartas recém-compradas: começam viradas (verso) à esquerda e giram para a frente
     const drawnEls = cardEls.filter(el => newCardIds.has(el.dataset.cardId));
     for (const el of drawnEls) {
       const targetTransform = el.style.transform || "";
@@ -665,7 +731,6 @@ export class AceOfCardsModal {
 
     if (!transitionsToRestore.length) return;
 
-    // Força reflow e dispara a transição suave
     void this.element.offsetWidth;
 
     requestAnimationFrame(() => {
@@ -704,7 +769,6 @@ export class AceOfCardsModal {
 
     this.element.classList.toggle("is-minimized", this.isMinimized);
 
-    // MODO MINIMIZADO
     if (this.isMinimized) {
       const handSummary = state.hand.length
         ? state.hand
@@ -749,7 +813,6 @@ export class AceOfCardsModal {
       return;
     }
 
-    // Limpa seleções inválidas
     const handIds = new Set(state.hand.map(c => c.id));
     for (const id of Array.from(this.selectedHandIds)) {
       if (!handIds.has(id)) this.selectedHandIds.delete(id);
@@ -823,7 +886,6 @@ export class AceOfCardsModal {
       })
       .join("");
 
-    // Ícones oficiais da ficha do Varian
     const iconMagicCards = this.getSkillIcon(actor, "magic-cards");
     const iconMulligan = this.getSkillIcon(actor, "mulligan");
     const iconTrapCard = this.getSkillIcon(actor, "trap-card");
@@ -930,7 +992,6 @@ export class AceOfCardsModal {
       </header>
 
       <div class="fu-ace-body">
-        <!-- COLUNA ESQUERDA: BARALHO E DESCARTE -->
         <div class="fu-ace-piles-col">
           <div class="fu-ace-pile-box" title="Baralho (${state.deck.length}/30 cartas)">
             <div class="fu-ace-pile-card">
@@ -957,7 +1018,6 @@ export class AceOfCardsModal {
           </div>
         </div>
 
-        <!-- ÁREA DIREITA: MÃO EM LEQUE + CONTROLES -->
         <div class="fu-ace-main-col">
           <div class="fu-ace-hand-row">
             <div class="fu-ace-hand-fan">
@@ -968,7 +1028,6 @@ export class AceOfCardsModal {
             </div>
           </div>
 
-          <!-- PAINEL DE DETECÇÃO DE CONJUNTO -->
           <div class="fu-ace-combo-banner ${activeCombo ? "has-combo" : ""}">
             ${
               selectedCards.length === 0
@@ -986,12 +1045,10 @@ export class AceOfCardsModal {
             }
           </div>
 
-          <!-- BOTÕES DE AÇÃO NA ORDEM EXATA (3 POR LINHA) -->
           ${
             canEdit
               ? `
             <div class="fu-ace-actions-grid">
-              <!-- Linha 1: Iniciar Conflito, Embaralhar, Comprar 1 -->
               <button type="button" class="fu-ace-btn is-primary" data-action="start-conflict" title="Embaralha as 30 cartas e compra 5">
                 <i class="fa-solid fa-play"></i> Iniciar Conflito
               </button>
@@ -1004,7 +1061,6 @@ export class AceOfCardsModal {
                 <i class="fa-solid fa-plus"></i> Comprar 1
               </button>
 
-              <!-- Linha 2: Descartar, Topo do Baralho, Fundo do Baralho -->
               <button type="button" class="fu-ace-btn" data-action="discard-selected" ${selectedCards.length === 0 ? "disabled" : ""}>
                 <i class="fa-solid fa-trash-can"></i> Descartar (${selectedCards.length})
               </button>
@@ -1017,7 +1073,6 @@ export class AceOfCardsModal {
                 <i class="fa-solid fa-arrow-down"></i> Fundo do Baralho
               </button>
 
-              <!-- Linha 3: Cartas Mágicas, Mulligan, Armadilha -->
               <button type="button" class="fu-ace-btn is-accent" data-action="resolve-magic" ${selectedCards.length < 2 ? "disabled" : ""} title="Gasta 5 PM por carta, resolve o conjunto e descarta">
                 <img src="${iconMagicCards}" class="fu-ace-btn-icon" alt="" /> Cartas Mágicas (${selectedCards.length * 5} PM)
               </button>
@@ -1030,7 +1085,6 @@ export class AceOfCardsModal {
                 <img src="${iconTrapCard}" class="fu-ace-btn-icon" alt="" /> Armadilha
               </button>
 
-              <!-- Linha 4: Altos e Baixos, Dobro ou Nada, Vanguarda -->
               <button type="button" class="fu-ace-btn" data-action="high-low" ${selectedCards.length !== 1 ? "disabled" : ""} title="Descarta 1 carta selecionada da mão">
                 <img src="${iconHighLow}" class="fu-ace-btn-icon" alt="" /> Altos e Baixos
               </button>
@@ -1043,7 +1097,6 @@ export class AceOfCardsModal {
                 <img src="${iconVanguard}" class="fu-ace-btn-icon" alt="" /> Vanguarda
               </button>
 
-              <!-- Linha 5: Fim do Conflito -->
               <button type="button" class="fu-ace-btn is-danger" data-action="end-conflict">
                 <i class="fa-solid fa-stop"></i> Fim do Conflito
               </button>
