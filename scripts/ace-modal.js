@@ -1,6 +1,7 @@
 import {
   MODULE_ID,
   SUITS,
+  SKILL_DEFAULT_ICONS,
   createFullDeck,
   getCardBackUrl,
   getCardImageUrl,
@@ -9,11 +10,14 @@ import {
 } from "./deck-data.js";
 
 const STORAGE_POS_KEY = `${MODULE_ID}.modalPosition`;
+const STORAGE_MIN_KEY = `${MODULE_ID}.modalMinimized`;
 
 export class AceOfCardsModal {
   constructor() {
     this.element = null;
     this.isOpen = false;
+    this.isMinimized = localStorage.getItem(STORAGE_MIN_KEY) === "true";
+    this.showTrapSuitPicker = false;
     this.selectedHandIds = new Set();
     this.chosenElement = null;
     this.chosenConditions = new Set(["shaken", "slow"]);
@@ -21,14 +25,35 @@ export class AceOfCardsModal {
     this.showDiscardViewer = false;
   }
 
-  getAceActor() {
-    return (
-      game.actors.find(a =>
-        a.items?.some(i => i.type === "class" && i.system?.fuid === "ace-of-cards")
-      ) ||
-      game.actors.find(a => a.name.toLowerCase().includes("varian")) ||
-      null
+  hasAceClass(actor) {
+    return Boolean(
+      actor?.items?.some(i => i.type === "class" && i.system?.fuid === "ace-of-cards")
     );
+  }
+
+  /**
+   * Localiza o ator principal do Carteador (priorizando o personagem vinculado ao jogador, como Varian).
+   */
+  getAceActor() {
+    if (this.hasAceClass(game.user?.character)) {
+      return game.user.character;
+    }
+
+    const playerLinkedActor = game.users.find(
+      u => !u.isGM && this.hasAceClass(u.character)
+    )?.character;
+    if (playerLinkedActor) return playerLinkedActor;
+
+    const varian = game.actors.find(
+      a => a.name.toLowerCase().includes("varian") && this.hasAceClass(a)
+    );
+    if (varian) return varian;
+
+    const aceActors = game.actors
+      .filter(a => this.hasAceClass(a))
+      .sort((a, b) => (b.system?.level?.value || 0) - (a.system?.level?.value || 0));
+
+    return aceActors[0] || game.actors.find(a => a.name.toLowerCase().includes("varian")) || null;
   }
 
   canInteract() {
@@ -41,6 +66,11 @@ export class AceOfCardsModal {
   getSkillNP(actor, fuid, fallback = 1) {
     const item = actor?.items?.find(i => i.system?.fuid === fuid);
     return Number(item?.system?.level?.value ?? fallback);
+  }
+
+  getSkillIcon(actor, fuid) {
+    const item = actor?.items?.find(i => i.system?.fuid === fuid);
+    return item?.img || SKILL_DEFAULT_ICONS[fuid] || "icons/sundries/gaming/playing-cards.webp";
   }
 
   getState() {
@@ -80,9 +110,6 @@ export class AceOfCardsModal {
     return copy;
   }
 
-  /**
-   * Compra N cartas respeitando a regra oficial de reembaralhar o descarte quando o baralho acaba.
-   */
   drawFromDeck(state, count) {
     let reshuffled = false;
     for (let i = 0; i < count; i++) {
@@ -103,6 +130,12 @@ export class AceOfCardsModal {
     else this.open();
   }
 
+  toggleMinimize() {
+    this.isMinimized = !this.isMinimized;
+    localStorage.setItem(STORAGE_MIN_KEY, String(this.isMinimized));
+    this.render();
+  }
+
   open() {
     this.isOpen = true;
     if (!this.element) {
@@ -114,6 +147,7 @@ export class AceOfCardsModal {
 
   close() {
     this.isOpen = false;
+    this.showTrapSuitPicker = false;
     if (this.element) {
       this.element.style.display = "none";
     }
@@ -126,8 +160,8 @@ export class AceOfCardsModal {
 
     const savedPos = JSON.parse(localStorage.getItem(STORAGE_POS_KEY) || "null");
     if (savedPos && typeof savedPos.left === "number" && typeof savedPos.top === "number") {
-      div.style.left = `${Math.max(10, Math.min(window.innerWidth - 320, savedPos.left))}px`;
-      div.style.top = `${Math.max(10, Math.min(window.innerHeight - 200, savedPos.top))}px`;
+      div.style.left = `${Math.max(10, Math.min(window.innerWidth - 260, savedPos.left))}px`;
+      div.style.top = `${Math.max(10, Math.min(window.innerHeight - 80, savedPos.top))}px`;
     } else {
       div.style.left = "90px";
       div.style.top = "95px";
@@ -154,8 +188,8 @@ export class AceOfCardsModal {
 
     handleEl.addEventListener("pointermove", e => {
       if (!isDragging) return;
-      const left = Math.max(0, Math.min(window.innerWidth - 180, e.clientX - offsetX));
-      const top = Math.max(0, Math.min(window.innerHeight - 80, e.clientY - offsetY));
+      const left = Math.max(0, Math.min(window.innerWidth - 160, e.clientX - offsetX));
+      const top = Math.max(0, Math.min(window.innerHeight - 44, e.clientY - offsetY));
       this.element.style.left = `${left}px`;
       this.element.style.top = `${top}px`;
     });
@@ -167,20 +201,31 @@ export class AceOfCardsModal {
       const rect = this.element.getBoundingClientRect();
       localStorage.setItem(STORAGE_POS_KEY, JSON.stringify({ left: rect.left, top: rect.top }));
     });
+
+    handleEl.addEventListener("dblclick", e => {
+      if (e.target.closest("button, input, select, label")) return;
+      e.preventDefault();
+      this.toggleMinimize();
+    });
+  }
+
+  formatCardPillHtml(card) {
+    if (card.isJoker) {
+      return `<span class="fu-ace-chat-pill is-joker">★ ${card.name}</span>`;
+    }
+    const suit = SUITS[card.suit];
+    const numLabel = card.value === 1 ? "Ás" : card.value;
+    return `
+      <span class="fu-ace-chat-pill" style="border-color:${suit.color}">
+        ${numLabel} de ${suit.name} @ICON[${suit.fuSuitIcon}] (@ICON[${suit.element}] ${suit.elementLabel})
+      </span>
+    `;
   }
 
   async postChatCard({ title, subtitle, bodyHtml, cards = [], footerHtml = "" }) {
     const actor = this.getAceActor();
     const cardsHtml = cards.length
-      ? `<div class="fu-ace-chat-cards">
-          ${cards
-            .map(
-              c => `<span class="fu-ace-chat-pill" style="border-color:${
-                c.isJoker ? "#fbbf24" : SUITS[c.suit]?.color || "#38bdf8"
-              }">${c.name}</span>`
-            )
-            .join("")}
-        </div>`
+      ? `<div class="fu-ace-chat-cards">${cards.map(c => this.formatCardPillHtml(c)).join("")}</div>`
       : "";
 
     const content = `
@@ -277,7 +322,6 @@ export class AceOfCardsModal {
     }
 
     state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
-    // Topo do descarte fica no final do array (face para cima na ordem escolhida)
     state.discard.push(...selected);
     this.selectedHandIds.clear();
     await this.saveState(state);
@@ -334,17 +378,15 @@ export class AceOfCardsModal {
       return;
     }
 
-    // Desconta PM automaticamente na ficha do Varian se marcado
     if (this.spendMpAuto && actor) {
       const currentMp = Number(actor.system?.resources?.mp?.value ?? 0);
       if (currentMp < mpCost) {
-        ui.notifications.warn(`PM insuficiente (${currentMp}/${mpCost} PM).`);
+        ui.notifications.warn(`PM insuficiente na ficha de ${actor.name} (${currentMp}/${mpCost} PM).`);
         return;
       }
       await actor.update({ "system.resources.mp.value": currentMp - mpCost });
     }
 
-    // Verifica triggers de Altos e Baixos
     const highLowNP = this.getSkillNP(actor, "high-or-low", 1);
     const hasJoker = selected.some(c => c.isJoker);
     const hasSeven = selected.some(c => !c.isJoker && c.value === 7);
@@ -352,24 +394,22 @@ export class AceOfCardsModal {
 
     const highLowNotes = [];
     if (hasJoker || hasSeven) {
-      highLowNotes.push(`<strong>Altos e Baixos (+${highLowNP} dano):</strong> você causa <strong>${highLowNP}</strong> de dano extra até o início do seu próximo turno.`);
+      highLowNotes.push(`<strong>Altos e Baixos (+${highLowNP} dano):</strong> causa <strong>${highLowNP}</strong> de dano extra até o início do próximo turno.`);
     }
     if (hasJoker || hasOne) {
-      highLowNotes.push(`<strong>Altos e Baixos (-${highLowNP} dano sofrido):</strong> reduz todo dano sofrido em <strong>${highLowNP}</strong> até o início do seu próximo turno.`);
+      highLowNotes.push(`<strong>Altos e Baixos (-${highLowNP} dano sofrido):</strong> reduz todo dano sofrido em <strong>${highLowNP}</strong> até o início do próximo turno.`);
     }
     if (!hasJoker && !hasSeven && !hasOne) {
       const healHp = highLowNP * 2;
       highLowNotes.push(`<strong>Altos e Baixos:</strong> recupera @HEAL[${healHp} hp] (nenhum Curinga, 1 ou 7 usado).`);
     }
 
-    // Descarta as cartas usadas e compra a mesma quantidade
     state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
     state.discard.push(...selected);
     const reshuffled = this.drawFromDeck(state, selected.length);
     this.selectedHandIds.clear();
     await this.saveState(state);
 
-    // Monta o texto do efeito com enrichers nativos do Project FU
     let effectBlock = `<p><strong>Sem conjunto válido:</strong> cartas resolvidas individualmente.</p>`;
     if (combo) {
       const chosenSuitKey =
@@ -380,11 +420,11 @@ export class AceOfCardsModal {
 
       if (combo.id === "magic-pair") {
         effectBlock = `
-          <p><strong>${combo.name}:</strong> Realize um <strong>ataque livre</strong> com uma arma equipada. Todo o dano causado torna-se do tipo <strong>${chosenSuit.elementLabel}</strong>.</p>
+          <p><strong>${combo.name}:</strong> Realize um <strong>ataque livre</strong> com uma arma equipada. Todo o dano causado torna-se do tipo @ICON[${chosenSuit.element}] <strong>${chosenSuit.elementLabel}</strong> (@ICON[${chosenSuit.fuSuitIcon}] ${chosenSuit.name}).</p>
         `;
       } else if (combo.id === "double-trouble") {
         effectBlock = `
-          <p><strong>${combo.name}:</strong> Escolha <strong>1 ou 2 inimigos</strong> presentes na cena: @DMG[${combo.damage} ${chosenSuit.element}]</p>
+          <p><strong>${combo.name}:</strong> Escolha <strong>1 ou 2 inimigos</strong> presentes na cena (@ICON[${chosenSuit.fuSuitIcon}] ${chosenSuit.name}): @DMG[${combo.damage} ${chosenSuit.element}]</p>
         `;
       } else if (combo.id === "magic-flush") {
         effectBlock = `
@@ -482,6 +522,7 @@ export class AceOfCardsModal {
   }
 
   async actionTrapCardBottomReveal(declaredSuitKey) {
+    this.showTrapSuitPicker = false;
     const actor = this.getAceActor();
     const state = this.getState();
     const trapNP = this.getSkillNP(actor, "trap-card", 4);
@@ -502,11 +543,11 @@ export class AceOfCardsModal {
 
     await this.postChatCard({
       title: `Carta Armadilha — Fundo do Baralho`,
-      subtitle: `Naipe declarado: ${declaredSuit.name} (${declaredSuit.symbol} ${declaredSuit.elementLabel})`,
+      subtitle: `Naipe declarado: ${declaredSuit.name} @ICON[${declaredSuit.fuSuitIcon}] (@ICON[${declaredSuit.element}] ${declaredSuit.elementLabel})`,
       cards: [bottomCard],
       bodyHtml: success
         ? `<p><strong>SUCESSO!</strong> A carta do fundo era <strong>${bottomCard.name}</strong>. Você pode lançar um <strong>Feitiço</strong> de graça com custo até <strong>${maxSpellMp} PM</strong>!</p>`
-        : `<p><strong>Falhou:</strong> A carta do fundo era <strong>${bottomCard.name}</strong> (não corresponde a ${declaredSuit.name}).</p>`
+        : `<p><strong>Falhou:</strong> A carta do fundo era <strong>${bottomCard.name}</strong> (não corresponde a ${declaredSuit.name} @ICON[${declaredSuit.fuSuitIcon}]).</p>`
     });
   }
 
@@ -576,7 +617,7 @@ export class AceOfCardsModal {
 
     const elemText = card.isJoker
       ? "<strong>Curinga (absorve qualquer tipo de dano!)</strong>"
-      : `naipe de <strong>${SUITS[card.suit].name} (${SUITS[card.suit].elementLabel})</strong>`;
+      : `naipe de <strong>${SUITS[card.suit].name}</strong> @ICON[${SUITS[card.suit].fuSuitIcon}] (@ICON[${SUITS[card.suit].element}] ${SUITS[card.suit].elementLabel})`;
 
     await this.postChatCard({
       title: "Vanguarda de Cartas Revelada!",
@@ -597,6 +638,53 @@ export class AceOfCardsModal {
     const actorLevel = Number(actor?.system?.level?.value ?? 21);
     const mpCurrent = Number(actor?.system?.resources?.mp?.value ?? 0);
     const mpMax = Number(actor?.system?.resources?.mp?.max ?? 0);
+
+    this.element.classList.toggle("is-minimized", this.isMinimized);
+
+    // MODO MINIMIZADO (estilo Mini Calendar)
+    if (this.isMinimized) {
+      const handSummary = state.hand.length
+        ? state.hand
+            .map(c => {
+              const cls = c.isJoker ? "is-joker" : `suit-${c.suit}`;
+              return `<span class="fu-ace-mini-pill ${cls}">${c.shortLabel}</span>`;
+            })
+            .join("")
+        : `<span class="fu-ace-muted">Mão vazia</span>`;
+
+      this.element.innerHTML = `
+        <header class="fu-ace-header" title="Duplo clique para expandir">
+          <div class="fu-ace-title">
+            <i class="fa-solid fa-wand-sparkles"></i>
+            <span><strong>${actor?.name || "Varian"}</strong> (Nv.${actorLevel})</span>
+            <span class="fu-ace-mp-badge">PM: ${mpCurrent}/${mpMax}</span>
+          </div>
+          <div class="fu-ace-win-btns">
+            <button type="button" data-action="toggle-min" title="Expandir"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+            <button type="button" data-action="close" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </header>
+        <div class="fu-ace-minimized-body">
+          <div class="fu-ace-min-stats">
+            <span title="Cartas no Baralho"><i class="fa-solid fa-layer-group"></i> ${state.deck.length}</span>
+            <span title="Cartas na Mão"><i class="fa-solid fa-hand"></i> ${state.hand.length}</span>
+            <span title="Cartas no Descarte"><i class="fa-solid fa-trash-can"></i> ${state.discard.length}</span>
+            ${
+              canEdit
+                ? `<button type="button" class="fu-ace-min-draw" data-action="draw-1" title="Comprar 1 carta">+1 Carta</button>`
+                : ""
+            }
+          </div>
+          <div class="fu-ace-min-hand">${handSummary}</div>
+        </div>
+      `;
+
+      this.bindDrag(this.element.querySelector(".fu-ace-header"));
+      this.element.querySelector("[data-action='toggle-min']")?.addEventListener("click", () => this.toggleMinimize());
+      this.element.querySelector("[data-action='close']")?.addEventListener("click", () => this.close());
+      this.element.querySelector("[data-action='draw-1']")?.addEventListener("click", () => this.actionDraw(1));
+      return;
+    }
 
     // Limpa seleções inválidas
     const handIds = new Set(state.hand.map(c => c.id));
@@ -622,6 +710,7 @@ export class AceOfCardsModal {
             const angle = offset * 4.5;
             const translateY = Math.abs(offset) * 3.5;
             const fallback = buildFallbackCardSvg(card);
+            const suitClass = card.isJoker ? "is-joker" : `suit-${card.suit}`;
 
             return `
               <div class="fu-ace-card ${isSelected ? "is-selected" : ""}"
@@ -629,7 +718,7 @@ export class AceOfCardsModal {
                    title="${card.name}"
                    style="--fan-angle:${angle}deg; --fan-y:${translateY}px; z-index:${isSelected ? 50 + index : 10 + index};">
                 <img src="${getCardImageUrl(card)}" data-fallback="${fallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="${card.name}" />
-                <span class="fu-ace-card-tag">${card.shortLabel}</span>
+                <span class="fu-ace-card-tag ${suitClass}">${card.shortLabel}</span>
               </div>
             `;
           })
@@ -651,7 +740,14 @@ export class AceOfCardsModal {
       })
       .join("");
 
-    // Seletor dinâmico de elemento ou condições quando o conjunto exige escolha
+    // Ícones oficiais da ficha do Varian
+    const iconMagicCards = this.getSkillIcon(actor, "magic-cards");
+    const iconMulligan = this.getSkillIcon(actor, "mulligan");
+    const iconTrapCard = this.getSkillIcon(actor, "trap-card");
+    const iconHighLow = this.getSkillIcon(actor, "high-or-low");
+    const iconDoubleNothing = this.getSkillIcon(actor, "double-or-nothing");
+    const iconVanguard = this.getSkillIcon(actor, "card-vanguard");
+
     let comboExtraHtml = "";
     if (activeCombo && canEdit) {
       if (activeCombo.id === "magic-pair" || activeCombo.id === "double-trouble") {
@@ -679,6 +775,35 @@ export class AceOfCardsModal {
       }
     }
 
+    // Sub-modal estilizado em dourado/vermelho para declarar naipe em Carta Armadilha (Fundo)
+    const trapPickerOverlayHtml =
+      this.showTrapSuitPicker && canEdit
+        ? `
+        <div class="fu-ace-submodal-backdrop">
+          <div class="fu-ace-submodal">
+            <div class="fu-ace-submodal-head">
+              <span><img src="${iconTrapCard}" class="fu-ace-btn-icon" /> Carta Armadilha — Declarar Naipe</span>
+              <button type="button" data-action="close-trap-picker"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="fu-ace-submodal-text">Escolha o naipe que deseja declarar antes de revelar a carta do fundo do baralho:</p>
+            <div class="fu-ace-suit-grid">
+              ${Object.values(SUITS)
+                .map(
+                  s => `
+                <button type="button" class="fu-ace-suit-choice" data-declare-suit="${s.id}">
+                  <span class="fu-ace-suit-sym" style="color:${s.color}">${s.symbol}</span>
+                  <span class="fu-ace-suit-name">${s.name}</span>
+                  <span class="fu-ace-suit-elem">${s.elementLabel}</span>
+                </button>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+        </div>
+      `
+        : "";
+
     const discardViewerHtml = this.showDiscardViewer
       ? `
         <div class="fu-ace-discard-drawer">
@@ -705,7 +830,7 @@ export class AceOfCardsModal {
       : "";
 
     this.element.innerHTML = `
-      <header class="fu-ace-header">
+      <header class="fu-ace-header" title="Arraste para mover • Duplo clique para minimizar">
         <div class="fu-ace-title">
           <i class="fa-solid fa-wand-sparkles"></i>
           <span>Baralho do Carteador — <strong>${actor?.name || "Varian"}</strong> (Nv.${actorLevel})</span>
@@ -713,6 +838,7 @@ export class AceOfCardsModal {
           ${!canEdit ? `<span class="fu-ace-readonly-badge">Modo Espectador</span>` : ""}
         </div>
         <div class="fu-ace-win-btns">
+          <button type="button" data-action="toggle-min" title="Minimizar"><i class="fa-solid fa-window-minimize"></i></button>
           <button type="button" data-action="close" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
         </div>
       </header>
@@ -774,7 +900,7 @@ export class AceOfCardsModal {
             }
           </div>
 
-          <!-- BOTÕES DE AÇÃO -->
+          <!-- BOTÕES DE AÇÃO COM ÍCONES OFICIAIS DA FICHA -->
           ${
             canEdit
               ? `
@@ -784,7 +910,7 @@ export class AceOfCardsModal {
               </button>
 
               <button type="button" class="fu-ace-btn is-accent" data-action="resolve-magic" ${selectedCards.length < 2 ? "disabled" : ""} title="Gasta 5 PM por carta, resolve o conjunto, descarta e compra">
-                <i class="fa-solid fa-sparkles"></i> Cartas Mágicas (${selectedCards.length * 5} PM)
+                <img src="${iconMagicCards}" class="fu-ace-btn-icon" alt="" /> Cartas Mágicas (${selectedCards.length * 5} PM)
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="draw-1">
@@ -792,27 +918,27 @@ export class AceOfCardsModal {
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="mulligan" ${selectedCards.length === 0 ? "disabled" : ""}>
-                <i class="fa-solid fa-arrows-rotate"></i> Mulligan (${selectedCards.length})
+                <img src="${iconMulligan}" class="fu-ace-btn-icon" alt="" /> Mulligan (${selectedCards.length})
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="trap-hand" ${selectedCards.length === 0 ? "disabled" : ""} title="Descarta cartas selecionadas da mão para Carta Armadilha e compra">
-                <i class="fa-solid fa-bolt"></i> Armadilha (Mão)
+                <img src="${iconTrapCard}" class="fu-ace-btn-icon" alt="" /> Armadilha (Mão)
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="trap-bottom" title="Declara um naipe e descarta a carta do fundo do baralho">
-                <i class="fa-solid fa-layer-group"></i> Armadilha (Fundo)
+                <img src="${iconTrapCard}" class="fu-ace-btn-icon" alt="" /> Armadilha (Fundo)
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="high-low" ${selectedCards.length !== 1 ? "disabled" : ""} title="Crítico/Falha Crítica: compra 1 e descarta 1 selecionada">
-                <i class="fa-solid fa-scale-balanced"></i> Altos e Baixos
+                <img src="${iconHighLow}" class="fu-ace-btn-icon" alt="" /> Altos e Baixos
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="double-nothing">
-                <i class="fa-solid fa-dice"></i> Dobro ou Nada
+                <img src="${iconDoubleNothing}" class="fu-ace-btn-icon" alt="" /> Dobro ou Nada
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="place-vanguard" ${selectedCards.length !== 1 || state.vanguard.length >= 2 ? "disabled" : ""}>
-                <i class="fa-solid fa-shield-halved"></i> Vanguarda
+                <img src="${iconVanguard}" class="fu-ace-btn-icon" alt="" /> Vanguarda
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="discard-selected" ${selectedCards.length === 0 ? "disabled" : ""}>
@@ -839,7 +965,7 @@ export class AceOfCardsModal {
             <div class="fu-ace-footer-bar">
               <label class="fu-ace-checkbox">
                 <input type="checkbox" data-action="toggle-mp-auto" ${this.spendMpAuto ? "checked" : ""} />
-                <span>Descontar PM da ficha automaticamente ao usar Cartas Mágicas</span>
+                <span>Descontar PM da ficha de <strong>${actor?.name || "Varian"}</strong> automaticamente</span>
               </label>
             </div>
           `
@@ -849,6 +975,7 @@ export class AceOfCardsModal {
       </div>
 
       ${discardViewerHtml}
+      ${trapPickerOverlayHtml}
     `;
 
     this.bindEvents(activeCombo, canEdit);
@@ -861,6 +988,10 @@ export class AceOfCardsModal {
       btn.addEventListener("click", () => this.close())
     );
 
+    this.element.querySelectorAll("[data-action='toggle-min']").forEach(btn =>
+      btn.addEventListener("click", () => this.toggleMinimize())
+    );
+
     this.element.querySelectorAll("[data-action='toggle-discard-view']").forEach(el =>
       el.addEventListener("click", () => {
         this.showDiscardViewer = !this.showDiscardViewer;
@@ -870,7 +1001,6 @@ export class AceOfCardsModal {
 
     if (!canEdit) return;
 
-    // Seleção de cartas na mão
     this.element.querySelectorAll(".fu-ace-card[data-card-id]").forEach(cardEl => {
       cardEl.addEventListener("click", () => {
         const id = cardEl.dataset.cardId;
@@ -887,14 +1017,12 @@ export class AceOfCardsModal {
       });
     });
 
-    // Revelar Vanguarda
     this.element.querySelectorAll(".fu-ace-vanguard-slot[data-vanguard-idx]").forEach(slotEl => {
       slotEl.addEventListener("click", () => {
         this.actionRevealVanguard(Number(slotEl.dataset.vanguardIdx));
       });
     });
 
-    // Escolha de elemento no conjunto
     this.element.querySelectorAll("[data-choose-suit]").forEach(btn => {
       btn.addEventListener("click", () => {
         this.chosenElement = btn.dataset.chooseSuit;
@@ -902,7 +1030,6 @@ export class AceOfCardsModal {
       });
     });
 
-    // Escolha de condições no Full Status
     this.element.querySelectorAll("[data-toggle-cond]").forEach(btn => {
       btn.addEventListener("click", () => {
         const cond = btn.dataset.toggleCond;
@@ -942,19 +1069,20 @@ export class AceOfCardsModal {
     bindAction("double-nothing", () => this.actionDoubleOrNothing());
     bindAction("place-vanguard", () => this.actionPlaceVanguard());
 
-    bindAction("trap-bottom", async () => {
-      const buttons = Object.values(SUITS).reduce((acc, s) => {
-        acc[s.id] = {
-          label: `${s.symbol} ${s.name} (${s.elementLabel})`,
-          callback: () => this.actionTrapCardBottomReveal(s.id)
-        };
-        return acc;
-      }, {});
-      new Dialog({
-        title: "Carta Armadilha — Declarar Naipe",
-        content: "<p>Escolha o naipe que deseja declarar antes de revelar a carta do fundo do baralho:</p>",
-        buttons
-      }).render(true);
+    bindAction("trap-bottom", () => {
+      this.showTrapSuitPicker = true;
+      this.render();
+    });
+
+    bindAction("close-trap-picker", () => {
+      this.showTrapSuitPicker = false;
+      this.render();
+    });
+
+    this.element.querySelectorAll("[data-declare-suit]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        this.actionTrapCardBottomReveal(btn.dataset.declareSuit);
+      });
     });
   }
 }
