@@ -5,6 +5,7 @@ import {
   createFullDeck,
   getCardBackUrl,
   getCardImageUrl,
+  getOfficialElementIconHtml,
   buildFallbackCardSvg,
   detectCombinations
 } from "./deck-data.js";
@@ -23,6 +24,7 @@ export class AceOfCardsModal {
     this.chosenConditions = new Set(["shaken", "slow"]);
     this.spendMpAuto = true;
     this.showDiscardViewer = false;
+    this.pendingDrawAnim = null;
   }
 
   hasAceClass(actor) {
@@ -107,8 +109,13 @@ export class AceOfCardsModal {
     return copy;
   }
 
-  drawFromDeck(state, count) {
+  /**
+   * Compra cartas e as insere na ponta esquerda da mão (índice 0),
+   * empurrando as cartas anteriores para a direita.
+   */
+  drawFromDeck(state, count, insertLeft = true) {
     let reshuffled = false;
+    const drawnCards = [];
     for (let i = 0; i < count; i++) {
       if (state.deck.length === 0) {
         if (state.discard.length === 0) break;
@@ -117,9 +124,25 @@ export class AceOfCardsModal {
         reshuffled = true;
       }
       const card = state.deck.shift();
-      if (card) state.hand.push(card);
+      if (card) {
+        if (insertLeft) {
+          state.hand.unshift(card);
+        } else {
+          state.hand.push(card);
+        }
+        drawnCards.push(card);
+      }
     }
-    return reshuffled;
+    return { reshuffled, drawnCards };
+  }
+
+  captureCardPositions() {
+    const rects = new Map();
+    if (!this.element) return rects;
+    this.element.querySelectorAll(".fu-ace-card[data-card-id]").forEach(el => {
+      rects.set(el.dataset.cardId, el.getBoundingClientRect());
+    });
+    return rects;
   }
 
   toggle() {
@@ -254,7 +277,13 @@ export class AceOfCardsModal {
       inConflict: true
     };
     this.selectedHandIds.clear();
-    this.drawFromDeck(state, 5);
+    const { drawnCards } = this.drawFromDeck(state, 5, false);
+
+    this.pendingDrawAnim = {
+      newCardIds: new Set(drawnCards.map(c => c.id)),
+      prevRects: new Map()
+    };
+
     await this.saveState(state);
 
     await this.postChatCard({
@@ -283,10 +312,18 @@ export class AceOfCardsModal {
   }
 
   async actionDraw(count = 1) {
+    const prevRects = this.captureCardPositions();
     const state = this.getState();
-    const before = state.hand.length;
-    const reshuffled = this.drawFromDeck(state, count);
-    const drawn = state.hand.length - before;
+    const { reshuffled, drawnCards } = this.drawFromDeck(state, count, true);
+    const drawn = drawnCards.length;
+
+    if (drawn > 0) {
+      this.pendingDrawAnim = {
+        newCardIds: new Set(drawnCards.map(c => c.id)),
+        prevRects
+      };
+    }
+
     await this.saveState(state);
 
     await this.postChatCard({
@@ -356,9 +393,6 @@ export class AceOfCardsModal {
     });
   }
 
-  /**
-   * Cartas Mágicas: desconta PM, descarta as cartas usadas e publica o efeito no chat (sem comprar automaticamente).
-   */
   async actionResolveMagicCards(combo) {
     const actor = this.getAceActor();
     const state = this.getState();
@@ -463,9 +497,6 @@ export class AceOfCardsModal {
     });
   }
 
-  /**
-   * Mulligan: descarta as cartas selecionadas (sem comprar automaticamente).
-   */
   async actionMulligan() {
     const actor = this.getAceActor();
     const state = this.getState();
@@ -520,9 +551,6 @@ export class AceOfCardsModal {
     });
   }
 
-  /**
-   * Altos e Baixos: descarta 1 carta selecionada da mão (sem comprar automaticamente).
-   */
   async actionHighOrLowSwap() {
     const state = this.getState();
     const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
@@ -552,9 +580,6 @@ export class AceOfCardsModal {
     });
   }
 
-  /**
-   * Vanguarda de Cartas: baixa 1 carta virada para baixo (sem comprar automaticamente).
-   */
   async actionPlaceVanguard() {
     const state = this.getState();
     if (state.vanguard.length >= 2) {
@@ -600,10 +625,75 @@ export class AceOfCardsModal {
     });
   }
 
+  // ==================== ANIMAÇÃO DE COMPRA (FLIP + EMPURRAR) ====================
+
+  runDrawAnimations(animPayload) {
+    if (!animPayload || !this.element) return;
+    const { newCardIds, prevRects } = animPayload;
+    const cardEls = Array.from(this.element.querySelectorAll(".fu-ace-card[data-card-id]"));
+    if (!cardEls.length) return;
+
+    const transitionsToRestore = [];
+
+    // 1. FLIP nas cartas antigas para deslizarem suavemente para a direita
+    for (const el of cardEls) {
+      const id = el.dataset.cardId;
+      if (newCardIds.has(id)) continue;
+      const oldRect = prevRects.get(id);
+      if (!oldRect) continue;
+
+      const newRect = el.getBoundingClientRect();
+      const dx = oldRect.left - newRect.left;
+      const dy = oldRect.top - newRect.top;
+
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+        const targetTransform = el.style.transform || "";
+        el.style.transition = "none";
+        el.style.transform = `translate(${dx}px, ${dy}px) ${targetTransform}`;
+        transitionsToRestore.push({ el, targetTransform });
+      }
+    }
+
+    // 2. Cartas recém-compradas: começam viradas (verso) à esquerda e giram para a frente
+    const drawnEls = cardEls.filter(el => newCardIds.has(el.dataset.cardId));
+    for (const el of drawnEls) {
+      const targetTransform = el.style.transform || "";
+      el.style.transition = "none";
+      el.style.transform = `translate(-48px, -10px) rotateY(180deg) scale(0.92)`;
+      transitionsToRestore.push({ el, targetTransform, isDrawn: true });
+    }
+
+    if (!transitionsToRestore.length) return;
+
+    // Força reflow e dispara a transição suave
+    void this.element.offsetWidth;
+
+    requestAnimationFrame(() => {
+      for (const item of transitionsToRestore) {
+        item.el.style.transition = item.isDrawn
+          ? "transform 0.58s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease"
+          : "transform 0.46s cubic-bezier(0.22, 1, 0.36, 1)";
+        item.el.style.transform = item.targetTransform;
+      }
+
+      setTimeout(() => {
+        for (const item of transitionsToRestore) {
+          if (!item.el.isConnected) continue;
+          item.el.style.transition = "";
+          item.el.classList.remove("is-newly-drawn");
+          item.el.querySelector(".fu-ace-card-flip-back")?.remove();
+        }
+      }, 620);
+    });
+  }
+
   // ==================== RENDERIZAÇÃO DA INTERFACE ====================
 
   render() {
     if (!this.element || !this.isOpen) return;
+
+    const animPayload = this.pendingDrawAnim;
+    this.pendingDrawAnim = null;
 
     const actor = this.getAceActor();
     const canEdit = this.canInteract();
@@ -678,6 +768,7 @@ export class AceOfCardsModal {
       ? state.hand
           .map((card, index) => {
             const isSelected = this.selectedHandIds.has(card.id);
+            const isNewlyDrawn = animPayload?.newCardIds?.has(card.id);
             const mid = (totalHand - 1) / 2;
             const offset = index - mid;
             const angle = offset * 4.5;
@@ -688,20 +779,29 @@ export class AceOfCardsModal {
 
             const elemBadgeHtml = card.isJoker
               ? `<span class="fu-ace-card-elem is-joker" title="Coringa (Qualquer Elemento)"><i class="fa-solid fa-crown"></i></span>`
-              : `<span class="fu-ace-card-elem" style="color:${suitObj.elementColor}" title="Elemento: ${suitObj.elementLabel}">
-                   <i class="fa-solid ${suitObj.elementFaIcon}"></i>
+              : `<span class="fu-ace-card-elem" title="Elemento: ${suitObj.elementLabel}">
+                   ${getOfficialElementIconHtml(card.suit)}
                  </span>`;
 
+            const flipBackHtml = isNewlyDrawn
+              ? `<div class="fu-ace-card-flip-back">
+                   <img src="${backImg}" data-fallback="${backFallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="Verso" />
+                 </div>`
+              : "";
+
             return `
-              <div class="fu-ace-card ${isSelected ? "is-selected" : ""} ${card.isJoker ? "is-joker-card" : ""}"
+              <div class="fu-ace-card ${isSelected ? "is-selected" : ""} ${card.isJoker ? "is-joker-card" : ""} ${isNewlyDrawn ? "is-newly-drawn" : ""}"
                    data-card-id="${card.id}"
                    title="${card.name}"
-                   style="--fan-angle:${angle}deg; --fan-y:${translateY}px; z-index:${isSelected ? 50 + index : 10 + index};">
-                <img src="${getCardImageUrl(card)}" data-fallback="${fallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="${card.name}" />
-                <div class="fu-ace-card-corner">
-                  <span class="fu-ace-card-tag ${suitClass}">${card.shortLabel}</span>
-                  ${elemBadgeHtml}
+                   style="transform: translateY(${translateY}px) rotate(${angle}deg); z-index:${isSelected ? 50 + index : 10 + index};">
+                <div class="fu-ace-card-face">
+                  <img src="${getCardImageUrl(card)}" data-fallback="${fallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="${card.name}" />
+                  <div class="fu-ace-card-corner">
+                    <span class="fu-ace-card-tag ${suitClass}">${card.shortLabel}</span>
+                    ${elemBadgeHtml}
+                  </div>
                 </div>
+                ${flipBackHtml}
               </div>
             `;
           })
@@ -738,7 +838,11 @@ export class AceOfCardsModal {
           .map(sKey => {
             const s = SUITS[sKey];
             const active = (this.chosenElement || activeCombo.uniqueSuits[0]) === sKey;
-            return `<button type="button" class="fu-ace-chip ${active ? "is-active" : ""}" data-choose-suit="${sKey}">${s.symbol} ${s.elementLabel}</button>`;
+            const officialIcon = getOfficialElementIconHtml(sKey);
+            return `<button type="button" class="fu-ace-chip ${active ? "is-active" : ""}" data-choose-suit="${sKey}">
+              <span class="fu-ace-chip-icon">${officialIcon}</span>
+              <span>${s.elementLabel}</span>
+            </button>`;
           })
           .join("");
         comboExtraHtml = `<div class="fu-ace-combo-opts"><span>Elemento:</span> ${suitOptions}</div>`;
@@ -775,7 +879,7 @@ export class AceOfCardsModal {
                 <button type="button" class="fu-ace-suit-choice" data-declare-suit="${s.id}">
                   <span class="fu-ace-suit-sym" style="color:${s.color}">${s.symbol}</span>
                   <span class="fu-ace-suit-name">${s.name}</span>
-                  <span class="fu-ace-suit-elem">${s.elementLabel}</span>
+                  <span class="fu-ace-suit-elem">${getOfficialElementIconHtml(s.id)} ${s.elementLabel}</span>
                 </button>
               `
                 )
@@ -826,7 +930,7 @@ export class AceOfCardsModal {
       </header>
 
       <div class="fu-ace-body">
-        <!-- COLUNA ESQUERDA: BARALHO (SEM CLIQUE DE COMPRA) E DESCARTE -->
+        <!-- COLUNA ESQUERDA: BARALHO E DESCARTE -->
         <div class="fu-ace-piles-col">
           <div class="fu-ace-pile-box" title="Baralho (${state.deck.length}/30 cartas)">
             <div class="fu-ace-pile-card">
@@ -962,6 +1066,10 @@ export class AceOfCardsModal {
     `;
 
     this.bindEvents(activeCombo, canEdit);
+
+    if (animPayload) {
+      this.runDrawAnimations(animPayload);
+    }
   }
 
   bindEvents(activeCombo, canEdit) {
