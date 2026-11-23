@@ -331,7 +331,6 @@
   pointer-events: none;
 }
 
-/* Verso 3D usado durante a animação de compra da carta */
 .fu-ace-card-flip-back {
   position: absolute;
   inset: 0;
@@ -393,7 +392,6 @@
   box-shadow: 0 0 20px rgba(239, 68, 68, 0.95), 0 0 10px #fbbf24;
 }
 
-/* Canto Superior Esquerdo: Número/Naipe + Ícone Elemental Oficial abaixo */
 .fu-ace-card-corner {
   position: absolute;
   top: 4px;
@@ -461,7 +459,6 @@
   font-size: 12px;
 }
 
-/* Ícones oficiais inline no banner de conjunto e chips */
 .fu-ace-inline-icon .fu-icon,
 .fu-ace-chip-icon .fu-icon,
 .fu-ace-suit-elem .fu-icon {
@@ -830,75 +827,49 @@
   border-radius: 3px;
 }
 
-/* Estilo das Mensagens no Chat — Carmesim & Dourado */
-.fu-ace-chat-card {
-  background: linear-gradient(180deg, #270b10 0%, #140609 100%);
-  border: 1px solid #d4af37;
-  border-radius: 8px;
-  padding: 9px 11px;
-  color: #fef3c7;
-  font-family: "Signika", sans-serif;
-  box-shadow: inset 0 0 12px rgba(185, 28, 28, 0.25);
-}
+/* ==================== INTEGRAÇÃO COM O LAYOUT NATIVO DO CHAT DO PROJECT FU ==================== */
 
-.fu-ace-chat-header {
-  border-bottom: 1px solid rgba(212, 175, 55, 0.4);
-  padding-bottom: 5px;
-  margin-bottom: 7px;
-}
-
-.fu-ace-chat-title {
-  font-size: 14.5px;
-  font-weight: 700;
-  color: #fbbf24;
-}
-
-.fu-ace-chat-sub {
-  font-size: 11.5px;
-  color: #f3d1d1;
-}
-
-.fu-ace-chat-cards {
+.fu-ace-pfu-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 7px;
-}
-
-.fu-ace-chat-pill {
-  display: inline-flex;
   align-items: center;
-  gap: 3px;
-  background: rgba(55, 14, 20, 0.9);
-  border: 1px solid #d4af37;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #fffbeb;
+  gap: 8px;
+  margin-bottom: 5px;
 }
 
-.fu-ace-chat-pill.is-joker {
-  border-color: #fbbf24;
-  color: #fbbf24;
+.fu-ace-pfu-header__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid #2c4a43;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.fu-ace-chat-body {
-  font-size: 13px;
-  line-height: 1.45;
-  color: #fef3c7;
+.fu-ace-pfu-header__title {
+  font-size: 16.5px;
+  font-weight: 700;
+  font-variant: small-caps;
+  color: #2c4a43;
+  line-height: 1.15;
 }
 
-.fu-ace-chat-subblock {
+.fu-ace-native-card-tag {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+}
+
+.fu-ace-native-card-tag .fu-icon {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  vertical-align: middle;
+}
+
+.fu-ace-pfu-subnote {
   margin-top: 6px;
-  padding-top: 5px;
-  border-top: 1px dashed rgba(212, 175, 55, 0.35);
-  font-size: 12px;
-  color: #fde68a;
-}
-
-.fu-ace-chat-footer {
-  margin-top: 6px;
-  text-align: right;
-  font-size: 12px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(44, 74, 67, 0.35);
+  font-size: 12.5px;
 }
