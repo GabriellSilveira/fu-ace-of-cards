@@ -1,4 +1,4 @@
-import { MODULE_ID, syncDarkGoldCatalog } from "./deck-data.js";
+import { MODULE_ID, syncCoreDeckCatalog } from "./deck-data.js";
 import { AceOfCardsModal } from "./ace-modal.js";
 
 let aceModalInstance = null;
@@ -20,7 +20,7 @@ function injectSidebarButton() {
             aria-label="Baralho do Carteador">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="4" width="11" height="16" rx="2" transform="rotate(-8 8.5 12)"></rect>
-        <rect x="9" y="4" width="11" height="16" rx="2" transform="rotate(8 14.5 12)" fill="rgba(15,23,42,0.85)"></rect>
+        <rect x="9" y="4" width="11" height="16" rx="2" transform="rotate(8 14.5 12)" fill="rgba(28,12,15,0.88)"></rect>
         <path d="M14.5 9.5l1.5 2-1.5 2-1.5-2z" fill="currentColor"></path>
       </svg>
     </button>
@@ -46,7 +46,7 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
-  await syncDarkGoldCatalog();
+  await syncCoreDeckCatalog();
   injectSidebarButton();
 
   game.socket.on(`module.${MODULE_ID}`, payload => {
