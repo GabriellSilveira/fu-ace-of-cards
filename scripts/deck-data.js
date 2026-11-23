@@ -21,6 +21,8 @@ export const SUITS = {
     fuSuitIcon: "diamond",
     element: "air",
     elementLabel: "Ar",
+    elementFaIcon: "fa-wind",
+    elementColor: "#38bdf8",
     color: "#f59e0b",
     trapTrigger: "Feitiço"
   },
@@ -31,6 +33,8 @@ export const SUITS = {
     fuSuitIcon: "heart",
     element: "fire",
     elementLabel: "Fogo",
+    elementFaIcon: "fa-fire",
+    elementColor: "#f87171",
     color: "#ef4444",
     trapTrigger: "Objetivo"
   },
@@ -41,6 +45,8 @@ export const SUITS = {
     fuSuitIcon: "spade",
     element: "ice",
     elementLabel: "Gelo",
+    elementFaIcon: "fa-snowflake",
+    elementColor: "#93c5fd",
     color: "#e2e8f0",
     trapTrigger: "Ataque"
   },
@@ -51,6 +57,8 @@ export const SUITS = {
     fuSuitIcon: "club",
     element: "earth",
     elementLabel: "Terra",
+    elementFaIcon: "fa-mountain",
+    elementColor: "#a3e635",
     color: "#eab308",
     trapTrigger: "Poder"
   }
