@@ -31,9 +31,6 @@ export class AceOfCardsModal {
     );
   }
 
-  /**
-   * Localiza o ator principal do Carteador (priorizando o personagem vinculado ao jogador, como Varian).
-   */
   getAceActor() {
     if (this.hasAceClass(game.user?.character)) {
       return game.user.character;
@@ -359,6 +356,9 @@ export class AceOfCardsModal {
     });
   }
 
+  /**
+   * Cartas Mágicas: desconta PM, descarta as cartas usadas e publica o efeito no chat (sem comprar automaticamente).
+   */
   async actionResolveMagicCards(combo) {
     const actor = this.getAceActor();
     const state = this.getState();
@@ -406,7 +406,6 @@ export class AceOfCardsModal {
 
     state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
     state.discard.push(...selected);
-    const reshuffled = this.drawFromDeck(state, selected.length);
     this.selectedHandIds.clear();
     await this.saveState(state);
 
@@ -454,70 +453,40 @@ export class AceOfCardsModal {
 
     await this.postChatCard({
       title: `Cartas Mágicas — ${combo ? combo.name : "Conjunto Livre"}`,
-      subtitle: `Custo: ${mpCost} PM (${selected.length} cartas) • Comprou ${selected.length} nova(s) carta(s)`,
+      subtitle: `Custo: ${mpCost} PM • ${selected.length} carta(s) descartada(s)`,
       cards: selected,
       bodyHtml: `
         ${effectBlock}
         <div class="fu-ace-chat-subblock">${highLowNotes.join("<br>")}</div>
-        ${reshuffled ? `<p><em>O descarte foi reembaralhado durante a compra.</em></p>` : ""}
       `,
       footerHtml: `@LOSS[${mpCost} mp]`
     });
   }
 
+  /**
+   * Mulligan: descarta as cartas selecionadas (sem comprar automaticamente).
+   */
   async actionMulligan() {
     const actor = this.getAceActor();
     const state = this.getState();
     const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
 
     if (!selected.length) {
-      ui.notifications.warn("Selecione as cartas da mão que deseja trocar no Mulligan.");
+      ui.notifications.warn("Selecione as cartas da mão que deseja descartar no Mulligan.");
       return;
     }
 
     const mulliganNP = this.getSkillNP(actor, "mulligan", 1);
     state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
     state.discard.push(...selected);
-    const reshuffled = this.drawFromDeck(state, selected.length);
     this.selectedHandIds.clear();
     await this.saveState(state);
 
     await this.postChatCard({
       title: `Mulligan (NP ${mulliganNP})`,
-      subtitle: `Descartou ${selected.length} carta(s) e comprou ${selected.length} nova(s)`,
+      subtitle: `Descartou ${selected.length} carta(s) da mão`,
       cards: selected,
-      bodyHtml: `<p>Descartou <strong>${selected.length}</strong> carta(s) da mão e comprou a mesma quantidade do baralho.</p>
-        ${reshuffled ? `<p><em>A pilha de descarte foi reembaralhada durante a compra.</em></p>` : ""}`
-    });
-  }
-
-  async actionTrapCardFromHand() {
-    const actor = this.getAceActor();
-    const state = this.getState();
-    const trapNP = this.getSkillNP(actor, "trap-card", 4);
-    const maxSpellMp = trapNP * 5;
-    const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
-
-    if (!selected.length) {
-      ui.notifications.warn("Selecione na mão as cartas compatíveis (Curingas ou naipe da ação inimiga).");
-      return;
-    }
-    if (selected.length > trapNP + 1) {
-      ui.notifications.warn(`Carta Armadilha (NP ${trapNP}) permite descartar até ${trapNP + 1} cartas.`);
-      return;
-    }
-
-    state.hand = state.hand.filter(c => !this.selectedHandIds.has(c.id));
-    state.discard.push(...selected);
-    this.drawFromDeck(state, selected.length);
-    this.selectedHandIds.clear();
-    await this.saveState(state);
-
-    await this.postChatCard({
-      title: `Carta Armadilha ativada! (NP ${trapNP})`,
-      subtitle: `Descartou ${selected.length} carta(s) e comprou ${selected.length}`,
-      cards: selected,
-      bodyHtml: `<p>Em resposta à ação inimiga, você pode realizar a ação <strong>Feitiço</strong> gratuitamente, lançando um feitiço com custo total de até <strong>${maxSpellMp} PM</strong> (pagando seu custo em PM).</p>`
+      bodyHtml: `<p>Descartou <strong>${selected.length}</strong> carta(s) da mão (compre ${selected.length} carta(s) usando <strong>Comprar 1</strong>).</p>`
     });
   }
 
@@ -551,6 +520,9 @@ export class AceOfCardsModal {
     });
   }
 
+  /**
+   * Altos e Baixos: descarta 1 carta selecionada da mão (sem comprar automaticamente).
+   */
   async actionHighOrLowSwap() {
     const state = this.getState();
     const selected = state.hand.filter(c => this.selectedHandIds.has(c.id));
@@ -561,15 +533,14 @@ export class AceOfCardsModal {
 
     state.hand = state.hand.filter(c => c.id !== selected[0].id);
     state.discard.push(selected[0]);
-    this.drawFromDeck(state, 1);
     this.selectedHandIds.clear();
     await this.saveState(state);
 
     await this.postChatCard({
-      title: "Altos e Baixos — Troca Crítica",
-      subtitle: "Comprou 1 carta e descartou 1 carta da mão",
+      title: "Altos e Baixos — Descarte Crítico",
+      subtitle: "Descartou 1 carta da mão",
       cards: selected,
-      bodyHtml: `<p>Após rolar um sucesso crítico ou falha crítica, comprou 1 carta do baralho e descartou <strong>${selected[0].name}</strong>.</p>`
+      bodyHtml: `<p>Descartou <strong>${selected[0].name}</strong> da mão por <strong>Altos e Baixos</strong> (use <strong>Comprar 1</strong> para puxar sua carta).</p>`
     });
   }
 
@@ -581,6 +552,9 @@ export class AceOfCardsModal {
     });
   }
 
+  /**
+   * Vanguarda de Cartas: baixa 1 carta virada para baixo (sem comprar automaticamente).
+   */
   async actionPlaceVanguard() {
     const state = this.getState();
     if (state.vanguard.length >= 2) {
@@ -595,14 +569,13 @@ export class AceOfCardsModal {
 
     state.hand = state.hand.filter(c => c.id !== selected[0].id);
     state.vanguard.push(selected[0]);
-    this.drawFromDeck(state, 1);
     this.selectedHandIds.clear();
     await this.saveState(state);
 
     await this.postChatCard({
       title: "Vanguarda de Cartas",
-      subtitle: `Baixou 1 carta virada para baixo (${state.vanguard.length}/2 em jogo) e comprou 1 carta`,
-      bodyHtml: `<p>Uma carta foi posicionada com a face para baixo na <strong>Vanguarda</strong> e 1 nova carta foi comprada do baralho.</p>`
+      subtitle: `Baixou 1 carta virada para baixo (${state.vanguard.length}/2 em jogo)`,
+      bodyHtml: `<p>Uma carta foi posicionada com a face para baixo na <strong>Vanguarda</strong> (use <strong>Comprar 1</strong> para puxar 1 carta).</p>`
     });
   }
 
@@ -641,7 +614,7 @@ export class AceOfCardsModal {
 
     this.element.classList.toggle("is-minimized", this.isMinimized);
 
-    // MODO MINIMIZADO (estilo Mini Calendar)
+    // MODO MINIMIZADO
     if (this.isMinimized) {
       const handSummary = state.hand.length
         ? state.hand
@@ -710,20 +683,30 @@ export class AceOfCardsModal {
             const angle = offset * 4.5;
             const translateY = Math.abs(offset) * 3.5;
             const fallback = buildFallbackCardSvg(card);
+            const suitObj = card.isJoker ? null : SUITS[card.suit];
             const suitClass = card.isJoker ? "is-joker" : `suit-${card.suit}`;
 
+            const elemBadgeHtml = card.isJoker
+              ? `<span class="fu-ace-card-elem is-joker" title="Coringa (Qualquer Elemento)"><i class="fa-solid fa-crown"></i></span>`
+              : `<span class="fu-ace-card-elem" style="color:${suitObj.elementColor}" title="Elemento: ${suitObj.elementLabel}">
+                   <i class="fa-solid ${suitObj.elementFaIcon}"></i>
+                 </span>`;
+
             return `
-              <div class="fu-ace-card ${isSelected ? "is-selected" : ""}"
+              <div class="fu-ace-card ${isSelected ? "is-selected" : ""} ${card.isJoker ? "is-joker-card" : ""}"
                    data-card-id="${card.id}"
                    title="${card.name}"
                    style="--fan-angle:${angle}deg; --fan-y:${translateY}px; z-index:${isSelected ? 50 + index : 10 + index};">
                 <img src="${getCardImageUrl(card)}" data-fallback="${fallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="${card.name}" />
-                <span class="fu-ace-card-tag ${suitClass}">${card.shortLabel}</span>
+                <div class="fu-ace-card-corner">
+                  <span class="fu-ace-card-tag ${suitClass}">${card.shortLabel}</span>
+                  ${elemBadgeHtml}
+                </div>
               </div>
             `;
           })
           .join("")
-      : `<div class="fu-ace-empty-hand">Mão vazia — clique em <strong>Iniciar Conflito</strong> ou <strong>Comprar</strong></div>`;
+      : `<div class="fu-ace-empty-hand">Mão vazia — clique em <strong>Iniciar Conflito</strong> ou <strong>Comprar 1</strong></div>`;
 
     const vanguardHtml = [0, 1]
       .map(slotIdx => {
@@ -775,7 +758,6 @@ export class AceOfCardsModal {
       }
     }
 
-    // Sub-modal estilizado em dourado/vermelho para declarar naipe em Carta Armadilha (Fundo)
     const trapPickerOverlayHtml =
       this.showTrapSuitPicker && canEdit
         ? `
@@ -844,10 +826,10 @@ export class AceOfCardsModal {
       </header>
 
       <div class="fu-ace-body">
-        <!-- COLUNA ESQUERDA: BARALHO E DESCARTE -->
+        <!-- COLUNA ESQUERDA: BARALHO (SEM CLIQUE DE COMPRA) E DESCARTE -->
         <div class="fu-ace-piles-col">
           <div class="fu-ace-pile-box" title="Baralho (${state.deck.length}/30 cartas)">
-            <div class="fu-ace-pile-card ${canEdit ? "is-clickable" : ""}" data-action="draw-1">
+            <div class="fu-ace-pile-card">
               ${
                 state.deck.length > 0
                   ? `<img src="${backImg}" data-fallback="${backFallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="Baralho" />`
@@ -900,36 +882,52 @@ export class AceOfCardsModal {
             }
           </div>
 
-          <!-- BOTÕES DE AÇÃO COM ÍCONES OFICIAIS DA FICHA -->
+          <!-- BOTÕES DE AÇÃO NA ORDEM EXATA (3 POR LINHA) -->
           ${
             canEdit
               ? `
             <div class="fu-ace-actions-grid">
+              <!-- Linha 1: Iniciar Conflito, Embaralhar, Comprar 1 -->
               <button type="button" class="fu-ace-btn is-primary" data-action="start-conflict" title="Embaralha as 30 cartas e compra 5">
-                <i class="fa-solid fa-play"></i> Iniciar Conflito (5)
+                <i class="fa-solid fa-play"></i> Iniciar Conflito
               </button>
 
-              <button type="button" class="fu-ace-btn is-accent" data-action="resolve-magic" ${selectedCards.length < 2 ? "disabled" : ""} title="Gasta 5 PM por carta, resolve o conjunto, descarta e compra">
-                <img src="${iconMagicCards}" class="fu-ace-btn-icon" alt="" /> Cartas Mágicas (${selectedCards.length * 5} PM)
+              <button type="button" class="fu-ace-btn" data-action="shuffle-deck" title="Embaralha as cartas restantes no baralho">
+                <i class="fa-solid fa-shuffle"></i> Embaralhar
               </button>
 
-              <button type="button" class="fu-ace-btn" data-action="draw-1">
+              <button type="button" class="fu-ace-btn" data-action="draw-1" title="Compra 1 carta do topo do baralho">
                 <i class="fa-solid fa-plus"></i> Comprar 1
+              </button>
+
+              <!-- Linha 2: Descartar, Topo do Baralho, Fundo do Baralho -->
+              <button type="button" class="fu-ace-btn" data-action="discard-selected" ${selectedCards.length === 0 ? "disabled" : ""}>
+                <i class="fa-solid fa-trash-can"></i> Descartar (${selectedCards.length})
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="to-top" ${selectedCards.length === 0 ? "disabled" : ""}>
+                <i class="fa-solid fa-arrow-up"></i> Topo do Baralho
+              </button>
+
+              <button type="button" class="fu-ace-btn" data-action="to-bottom" ${selectedCards.length === 0 ? "disabled" : ""}>
+                <i class="fa-solid fa-arrow-down"></i> Fundo do Baralho
+              </button>
+
+              <!-- Linha 3: Cartas Mágicas, Mulligan, Armadilha -->
+              <button type="button" class="fu-ace-btn is-accent" data-action="resolve-magic" ${selectedCards.length < 2 ? "disabled" : ""} title="Gasta 5 PM por carta, resolve o conjunto e descarta">
+                <img src="${iconMagicCards}" class="fu-ace-btn-icon" alt="" /> Cartas Mágicas (${selectedCards.length * 5} PM)
               </button>
 
               <button type="button" class="fu-ace-btn" data-action="mulligan" ${selectedCards.length === 0 ? "disabled" : ""}>
                 <img src="${iconMulligan}" class="fu-ace-btn-icon" alt="" /> Mulligan (${selectedCards.length})
               </button>
 
-              <button type="button" class="fu-ace-btn" data-action="trap-hand" ${selectedCards.length === 0 ? "disabled" : ""} title="Descarta cartas selecionadas da mão para Carta Armadilha e compra">
-                <img src="${iconTrapCard}" class="fu-ace-btn-icon" alt="" /> Armadilha (Mão)
+              <button type="button" class="fu-ace-btn" data-action="trap-bottom" title="Declara um naipe e revela/descarta a carta do fundo do baralho">
+                <img src="${iconTrapCard}" class="fu-ace-btn-icon" alt="" /> Armadilha
               </button>
 
-              <button type="button" class="fu-ace-btn" data-action="trap-bottom" title="Declara um naipe e descarta a carta do fundo do baralho">
-                <img src="${iconTrapCard}" class="fu-ace-btn-icon" alt="" /> Armadilha (Fundo)
-              </button>
-
-              <button type="button" class="fu-ace-btn" data-action="high-low" ${selectedCards.length !== 1 ? "disabled" : ""} title="Crítico/Falha Crítica: compra 1 e descarta 1 selecionada">
+              <!-- Linha 4: Altos e Baixos, Dobro ou Nada, Vanguarda -->
+              <button type="button" class="fu-ace-btn" data-action="high-low" ${selectedCards.length !== 1 ? "disabled" : ""} title="Descarta 1 carta selecionada da mão">
                 <img src="${iconHighLow}" class="fu-ace-btn-icon" alt="" /> Altos e Baixos
               </button>
 
@@ -941,24 +939,9 @@ export class AceOfCardsModal {
                 <img src="${iconVanguard}" class="fu-ace-btn-icon" alt="" /> Vanguarda
               </button>
 
-              <button type="button" class="fu-ace-btn" data-action="discard-selected" ${selectedCards.length === 0 ? "disabled" : ""}>
-                <i class="fa-solid fa-trash-can"></i> Descartar (${selectedCards.length})
-              </button>
-
-              <button type="button" class="fu-ace-btn" data-action="to-top" ${selectedCards.length === 0 ? "disabled" : ""}>
-                <i class="fa-solid fa-arrow-up"></i> Topo Baralho
-              </button>
-
-              <button type="button" class="fu-ace-btn" data-action="to-bottom" ${selectedCards.length === 0 ? "disabled" : ""}>
-                <i class="fa-solid fa-arrow-down"></i> Fundo Baralho
-              </button>
-
-              <button type="button" class="fu-ace-btn" data-action="shuffle-deck">
-                <i class="fa-solid fa-shuffle"></i> Embaralhar
-              </button>
-
+              <!-- Linha 5: Fim do Conflito -->
               <button type="button" class="fu-ace-btn is-danger" data-action="end-conflict">
-                <i class="fa-solid fa-stop"></i> Fim Conflito
+                <i class="fa-solid fa-stop"></i> Fim do Conflito
               </button>
             </div>
 
@@ -1064,7 +1047,6 @@ export class AceOfCardsModal {
     bindAction("to-bottom", () => this.actionMoveSelectedToDeck("bottom"));
     bindAction("resolve-magic", () => this.actionResolveMagicCards(activeCombo));
     bindAction("mulligan", () => this.actionMulligan());
-    bindAction("trap-hand", () => this.actionTrapCardFromHand());
     bindAction("high-low", () => this.actionHighOrLowSwap());
     bindAction("double-nothing", () => this.actionDoubleOrNothing());
     bindAction("place-vanguard", () => this.actionPlaceVanguard());
