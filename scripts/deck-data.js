@@ -13,6 +13,13 @@ const resolvedFilesCache = {
   }
 };
 
+export const ELEMENT_ICON_CACHE = {
+  diamonds: "",
+  hearts: "",
+  spades: "",
+  clubs: ""
+};
+
 export const SUITS = {
   diamonds: {
     id: "diamonds",
@@ -21,8 +28,7 @@ export const SUITS = {
     fuSuitIcon: "diamond",
     element: "air",
     elementLabel: "Ar",
-    elementFaIcon: "fa-wind",
-    elementColor: "#38bdf8",
+    fuElementClass: "fu-wind",
     color: "#f59e0b",
     trapTrigger: "Feitiço"
   },
@@ -33,8 +39,7 @@ export const SUITS = {
     fuSuitIcon: "heart",
     element: "fire",
     elementLabel: "Fogo",
-    elementFaIcon: "fa-fire",
-    elementColor: "#f87171",
+    fuElementClass: "fu-fire",
     color: "#ef4444",
     trapTrigger: "Objetivo"
   },
@@ -45,8 +50,7 @@ export const SUITS = {
     fuSuitIcon: "spade",
     element: "ice",
     elementLabel: "Gelo",
-    elementFaIcon: "fa-snowflake",
-    elementColor: "#93c5fd",
+    fuElementClass: "fu-ice",
     color: "#e2e8f0",
     trapTrigger: "Ataque"
   },
@@ -57,8 +61,7 @@ export const SUITS = {
     fuSuitIcon: "club",
     element: "earth",
     elementLabel: "Terra",
-    elementFaIcon: "fa-mountain",
-    elementColor: "#a3e635",
+    fuElementClass: "fu-earth",
     color: "#eab308",
     trapTrigger: "Poder"
   }
@@ -73,7 +76,28 @@ export const SKILL_DEFAULT_ICONS = {
   "card-vanguard": "icons/sundries/gaming/playing-cards-grey.webp"
 };
 
+export function getOfficialElementIconHtml(suitKey) {
+  const suit = SUITS[suitKey];
+  if (!suit) return "";
+  if (ELEMENT_ICON_CACHE[suitKey]) {
+    return ELEMENT_ICON_CACHE[suitKey];
+  }
+  return `<i class="fu-icon ${suit.fuElementClass}" aria-label="${suit.elementLabel}"></i>`;
+}
+
 export async function syncCoreDeckCatalog() {
+  try {
+    const enricher = foundry?.applications?.ux?.TextEditor?.implementation ?? TextEditor;
+    for (const [suitKey, suitObj] of Object.entries(SUITS)) {
+      const enriched = await enricher.enrichHTML(`@ICON[${suitObj.element}]`, { async: true });
+      if (enriched && !enriched.includes("@ICON[")) {
+        ELEMENT_ICON_CACHE[suitKey] = enriched;
+      }
+    }
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] Fallback para classes CSS fu-icon:`, err);
+  }
+
   try {
     const picker = foundry?.applications?.apps?.FilePicker?.implementation ?? FilePicker;
     const result = await picker.browse("public", CORE_DECK_PATH);
@@ -229,7 +253,9 @@ function evaluateConcreteCards(resolvedCards, originalCards, actorLevel = 1) {
 
   if (count === 4 && sameSuit && isSequential) {
     const damage = 25 + totalValue + tierBonus;
-    const suitObj = SUITS[uniqueSuits[0]];
+    const suitKey = uniqueSuits[0];
+    const suitObj = SUITS[suitKey];
+    const elemIcon = getOfficialElementIconHtml(suitKey);
     matches.push({
       id: "magic-flush",
       name: "Flush Mágico",
@@ -243,7 +269,7 @@ function evaluateConcreteCards(resolvedCards, originalCards, actorLevel = 1) {
       damage,
       damageType: suitObj.element,
       damageTypeLabel: suitObj.elementLabel,
-      summary: `Causa ${damage} de dano de ${suitObj.elementLabel} em cada inimigo presente na cena.`
+      summary: `Causa ${damage} de dano de <span class="fu-ace-inline-icon">${elemIcon}</span> <strong>${suitObj.elementLabel}</strong> em cada inimigo presente na cena.`
     });
   }
 
@@ -251,6 +277,7 @@ function evaluateConcreteCards(resolvedCards, originalCards, actorLevel = 1) {
     const damage = 15 + totalValue + tierBonus;
     const dmgType = isHighestEven ? "light" : "dark";
     const dmgLabel = isHighestEven ? "Luz" : "Trevas";
+    const dmgClass = isHighestEven ? "fu-light" : "fu-dark";
     matches.push({
       id: "blinding-flush",
       name: "Flush Ofuscante",
@@ -264,7 +291,7 @@ function evaluateConcreteCards(resolvedCards, originalCards, actorLevel = 1) {
       damage,
       damageType: dmgType,
       damageTypeLabel: dmgLabel,
-      summary: `Causa ${damage} de dano de ${dmgLabel} (maior valor ${highestValue} é ${isHighestEven ? "par" : "ímpar"}) em cada inimigo na cena.`
+      summary: `Causa ${damage} de dano de <span class="fu-ace-inline-icon"><i class="fu-icon ${dmgClass}"></i></span> <strong>${dmgLabel}</strong> (maior valor ${highestValue} é ${isHighestEven ? "par" : "ímpar"}) em cada inimigo na cena.`
     });
   }
 
