@@ -1,10 +1,10 @@
 export const MODULE_ID = "fu-ace-of-cards";
-export const CORE_DECK_PATH = "cards/dark-gold";
+export const CORE_DECK_PATH = "cards/light-soft";
 
 const resolvedFilesCache = {
   back: `${CORE_DECK_PATH}/back.webp`,
-  joker1: `${CORE_DECK_PATH}/joker-black.webp`,
-  joker2: `${CORE_DECK_PATH}/joker-red.webp`,
+  joker1: `${CORE_DECK_PATH}/black-joker.webp`,
+  joker2: `${CORE_DECK_PATH}/red-joker.webp`,
   aces: {
     diamonds: `${CORE_DECK_PATH}/diamonds-ace.webp`,
     hearts: `${CORE_DECK_PATH}/hearts-ace.webp`,
@@ -18,45 +18,54 @@ export const SUITS = {
     id: "diamonds",
     name: "Ouros",
     symbol: "♦",
+    fuSuitIcon: "diamond",
     element: "air",
     elementLabel: "Ar",
-    color: "#38bdf8",
+    color: "#f59e0b",
     trapTrigger: "Feitiço"
   },
   hearts: {
     id: "hearts",
     name: "Copas",
     symbol: "♥",
+    fuSuitIcon: "heart",
     element: "fire",
     elementLabel: "Fogo",
-    color: "#f87171",
+    color: "#ef4444",
     trapTrigger: "Objetivo"
   },
   spades: {
     id: "spades",
     name: "Espadas",
     symbol: "♠",
+    fuSuitIcon: "spade",
     element: "ice",
     elementLabel: "Gelo",
-    color: "#93c5fd",
+    color: "#e2e8f0",
     trapTrigger: "Ataque"
   },
   clubs: {
     id: "clubs",
     name: "Paus",
     symbol: "♣",
+    fuSuitIcon: "club",
     element: "earth",
     elementLabel: "Terra",
-    color: "#a3e635",
+    color: "#eab308",
     trapTrigger: "Poder"
   }
 };
 
-/**
- * Inspeciona a pasta nativa cards/dark-gold do Foundry para confirmar os nomes exatos
- * de verso, curingas e ases sem depender de adivinhação.
- */
-export async function syncDarkGoldCatalog() {
+export const SKILL_DEFAULT_ICONS = {
+  "magic-cards": "systems/projectfu/styles/static/compendium/classes/ace-card/magic_cards.png",
+  "mulligan": "systems/projectfu/styles/static/compendium/classes/ace-card/mulligan.png",
+  "trap-card": "systems/projectfu/styles/static/compendium/classes/ace-card/trap_card.png",
+  "high-or-low": "systems/projectfu/styles/static/compendium/classes/ace-card/high_or_low.png",
+  "double-or-nothing": "systems/projectfu/styles/static/compendium/classes/ace-card/double_or_nothing.png",
+  "card-vanguard": "icons/sundries/gaming/playing-cards-grey.webp"
+};
+
+export async function syncCoreDeckCatalog() {
   try {
     const picker = foundry?.applications?.apps?.FilePicker?.implementation ?? FilePicker;
     const result = await picker.browse("public", CORE_DECK_PATH);
@@ -66,10 +75,12 @@ export async function syncDarkGoldCatalog() {
     const backFile = files.find(f => /\/back[^/]*\.webp$/i.test(f));
     if (backFile) resolvedFilesCache.back = backFile;
 
-    const jokers = files.filter(f => /\/joker[^/]*\.webp$/i.test(f)).sort();
-    if (jokers[0]) resolvedFilesCache.joker1 = jokers[0];
-    if (jokers[1]) resolvedFilesCache.joker2 = jokers[1];
-    else if (jokers[0]) resolvedFilesCache.joker2 = jokers[0];
+    const blackJoker = files.find(f => /\/black-joker\.webp$/i.test(f));
+    const redJoker = files.find(f => /\/red-joker\.webp$/i.test(f));
+    const anyJokers = files.filter(f => /joker[^/]*\.webp$/i.test(f)).sort();
+
+    resolvedFilesCache.joker1 = blackJoker || anyJokers[0] || resolvedFilesCache.joker1;
+    resolvedFilesCache.joker2 = redJoker || anyJokers[1] || anyJokers[0] || resolvedFilesCache.joker2;
 
     for (const suitKey of Object.keys(SUITS)) {
       const aceFile = files.find(
@@ -124,7 +135,7 @@ export function createFullDeck() {
     suit: "joker",
     value: 0,
     isJoker: true,
-    name: "Curinga I",
+    name: "Curinga Negro",
     shortLabel: "★"
   };
   joker1.image = getCardImageUrl(joker1);
@@ -134,7 +145,7 @@ export function createFullDeck() {
     suit: "joker",
     value: 0,
     isJoker: true,
-    name: "Curinga II",
+    name: "Curinga Rubro",
     shortLabel: "★"
   };
   joker2.image = getCardImageUrl(joker2);
@@ -146,7 +157,7 @@ export function createFullDeck() {
 export function buildFallbackCardSvg(card) {
   if (!card) {
     const backSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="320" viewBox="0 0 220 320">
-      <rect x="4" y="4" width="212" height="312" rx="16" fill="#17152b" stroke="#d4af37" stroke-width="3"/>
+      <rect x="4" y="4" width="212" height="312" rx="16" fill="#240b0e" stroke="#d4af37" stroke-width="3"/>
       <circle cx="110" cy="160" r="52" fill="none" stroke="#d4af37" stroke-width="2"/>
       <text x="110" y="275" text-anchor="middle" fill="#d4af37" font-family="serif" font-size="13" letter-spacing="3">ARCANA</text>
     </svg>`;
@@ -155,7 +166,7 @@ export function buildFallbackCardSvg(card) {
 
   if (card.isJoker) {
     const jokerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="320" viewBox="0 0 220 320">
-      <rect x="4" y="4" width="212" height="312" rx="16" fill="#18122b" stroke="#f59e0b" stroke-width="3"/>
+      <rect x="4" y="4" width="212" height="312" rx="16" fill="#2b0d12" stroke="#f59e0b" stroke-width="3"/>
       <text x="110" y="164" text-anchor="middle" fill="#fbbf24" font-family="serif" font-weight="bold" font-size="46">★</text>
       <text x="110" y="242" text-anchor="middle" fill="#fde68a" font-family="sans-serif" font-weight="bold" font-size="16" letter-spacing="2">CURINGA</text>
     </svg>`;
@@ -164,10 +175,10 @@ export function buildFallbackCardSvg(card) {
 
   const suit = SUITS[card.suit];
   const cardSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="320" viewBox="0 0 220 320">
-    <rect x="4" y="4" width="212" height="312" rx="16" fill="#12131f" stroke="${suit.color}" stroke-width="3"/>
-    <text x="26" y="48" fill="${suit.color}" font-family="serif" font-weight="bold" font-size="28">${card.value}</text>
-    <text x="110" y="172" text-anchor="middle" fill="${suit.color}" font-family="serif" font-size="56">${suit.symbol}</text>
-    <text x="110" y="242" text-anchor="middle" fill="#e2e8f0" font-family="sans-serif" font-weight="bold" font-size="14" letter-spacing="2">${suit.elementLabel.toUpperCase()}</text>
+    <rect x="4" y="4" width="212" height="312" rx="16" fill="#f8fafc" stroke="#b91c1c" stroke-width="3"/>
+    <text x="26" y="48" fill="#991b1b" font-family="serif" font-weight="bold" font-size="28">${card.value}</text>
+    <text x="110" y="172" text-anchor="middle" fill="#991b1b" font-family="serif" font-size="56">${suit.symbol}</text>
+    <text x="110" y="242" text-anchor="middle" fill="#1e293b" font-family="sans-serif" font-weight="bold" font-size="14" letter-spacing="2">${suit.elementLabel.toUpperCase()}</text>
   </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(cardSvg)}`;
 }
