@@ -277,6 +277,7 @@
   background: rgba(38, 12, 16, 0.44);
   border: 1px dashed rgba(212, 175, 55, 0.35);
   border-radius: 8px;
+  overflow: visible;
 }
 
 .fu-ace-hand-fan {
@@ -287,6 +288,7 @@
   height: 150px;
   padding: 0 16px;
   perspective: 950px;
+  overflow: visible;
 }
 
 .fu-ace-empty-hand {
@@ -351,12 +353,14 @@
 }
 
 /* Laser Neon Contínuo percorrendo o contorno dos Curingas */
-.fu-ace-card.is-joker-card {
+.fu-ace-card.is-joker-card,
+.fu-ace-vp-card.is-joker-card {
   border-color: rgba(251, 191, 36, 0.45);
   box-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
 }
 
-.fu-ace-card.is-joker-card::after {
+.fu-ace-card.is-joker-card::after,
+.fu-ace-vp-card.is-joker-card::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -490,6 +494,7 @@
   font-size: 11px;
   color: #fde68a;
   overflow: hidden;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 
 .fu-ace-vanguard-slot.has-card {
@@ -499,14 +504,15 @@
 }
 
 .fu-ace-vanguard-slot.has-card:hover {
-  box-shadow: 0 0 12px rgba(251, 191, 36, 0.8);
+  transform: scale(1.04);
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.85);
 }
 
 .fu-ace-vanguard-slot img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.8;
+  opacity: 0.82;
   border: none;
 }
 
@@ -518,6 +524,79 @@
   border-radius: 3px;
   color: #fef3c7;
   font-weight: 700;
+}
+
+/* Preview Flutuante à Direita da Carta de Vanguarda */
+.fu-ace-vanguard-preview {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 40px;
+  z-index: 260;
+  width: 152px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(24, 10, 14, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid #fbbf24;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.85), 0 0 16px rgba(251, 191, 36, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transform: translateX(-8px) scale(0.96);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  pointer-events: none;
+}
+
+.fu-ace-vanguard-preview.is-left {
+  left: auto;
+  right: calc(100% + 12px);
+  transform: translateX(8px) scale(0.96);
+}
+
+.fu-ace-vanguard-preview.is-visible {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.fu-ace-vp-card {
+  position: relative;
+  width: 132px;
+  height: 192px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #d4af37;
+  background: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.75);
+}
+
+.fu-ace-vp-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: none;
+}
+
+.fu-ace-vp-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+
+.fu-ace-vp-info strong {
+  font-size: 12.5px;
+  color: #fbbf24;
+  line-height: 1.2;
+}
+
+.fu-ace-vp-info span {
+  font-size: 11px;
+  color: #fde68a;
+  opacity: 0.9;
 }
 
 /* Banner de Detecção de Conjunto */
