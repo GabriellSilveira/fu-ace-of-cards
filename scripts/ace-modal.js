@@ -26,6 +26,7 @@ export class AceOfCardsModal {
     this.spendMpAuto = true;
     this.showDiscardViewer = false;
     this.pendingDrawAnim = null;
+    this._renderVersion = 0;
   }
 
   hasAceClass(actor) {
@@ -96,9 +97,14 @@ export class AceOfCardsModal {
     const actor = this.getAceActor();
     if (!actor) return;
 
+    const renderBefore = this._renderVersion;
     await actor.setFlag(MODULE_ID, "deckState", newState);
     game.socket.emit(`module.${MODULE_ID}`, { type: "refresh" });
-    this.render();
+
+    // Evita duplo render caso o hook updateActor já tenha renderizado durante setFlag
+    if (this._renderVersion === renderBefore) {
+      this.render();
+    }
   }
 
   shuffleArray(arr) {
@@ -133,13 +139,31 @@ export class AceOfCardsModal {
     return { reshuffled, drawnCards };
   }
 
-  captureCardPositions() {
-    const rects = new Map();
-    if (!this.element) return rects;
+  captureAnimationSnapshot() {
+    const cardCenters = new Map();
+    let deckCenter = null;
+    if (!this.element) return { cardCenters, deckCenter };
+
+    const deckEl = this.element.querySelector(".fu-ace-pile-deck");
+    if (deckEl) {
+      const dRect = deckEl.getBoundingClientRect();
+      if (dRect.width > 0 && dRect.height > 0) {
+        deckCenter = {
+          x: dRect.left + dRect.width / 2,
+          y: dRect.top + dRect.height / 2
+        };
+      }
+    }
+
     this.element.querySelectorAll(".fu-ace-card[data-card-id]").forEach(el => {
-      rects.set(el.dataset.cardId, el.getBoundingClientRect());
+      const rect = el.getBoundingClientRect();
+      cardCenters.set(el.dataset.cardId, {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      });
     });
-    return rects;
+
+    return { cardCenters, deckCenter };
   }
 
   toggle() {
@@ -239,9 +263,6 @@ export class AceOfCardsModal {
     `;
   }
 
-  /**
-   * Publica mensagem no chat seguindo exatamente a estrutura nativa do sistema Project FU.
-   */
   async postChatCard({ title, icon = DECK_ICON, tags = [], bodyHtml, cards = [], footerHtml = "" }) {
     const actor = this.getAceActor();
 
@@ -290,6 +311,7 @@ export class AceOfCardsModal {
   // ==================== AÇÕES DO BARALHO E HABILIDADES ====================
 
   async actionStartConflict() {
+    const snapshot = this.captureAnimationSnapshot();
     const state = {
       deck: this.shuffleArray(createFullDeck()),
       hand: [],
@@ -302,7 +324,8 @@ export class AceOfCardsModal {
 
     this.pendingDrawAnim = {
       newCardIds: new Set(drawnCards.map(c => c.id)),
-      prevRects: new Map()
+      cardCenters: new Map(),
+      deckCenter: snapshot.deckCenter
     };
 
     await this.saveState(state);
@@ -335,7 +358,7 @@ export class AceOfCardsModal {
   }
 
   async actionDraw(count = 1) {
-    const prevRects = this.captureCardPositions();
+    const snapshot = this.captureAnimationSnapshot();
     const state = this.getState();
     const { reshuffled, drawnCards } = this.drawFromDeck(state, count, true);
     const drawn = drawnCards.length;
@@ -343,7 +366,8 @@ export class AceOfCardsModal {
     if (drawn > 0) {
       this.pendingDrawAnim = {
         newCardIds: new Set(drawnCards.map(c => c.id)),
-        prevRects
+        cardCenters: snapshot.cardCenters,
+        deckCenter: snapshot.deckCenter
       };
     }
 
@@ -693,51 +717,122 @@ export class AceOfCardsModal {
     });
   }
 
-  // ==================== ANIMAÇÃO DE COMPRA (FLIP + EMPURRAR) ====================
+  // ==================== PREVIEW DE HOVER NA VANGUARDA ====================
+
+  showVanguardPreview(card, slotEl) {
+    const previewEl = this.element?.querySelector("#fu-ace-vanguard-preview");
+    if (!previewEl || !card || !slotEl) return;
+
+    const fallback = buildFallbackCardSvg(card);
+    const suitObj = card.isJoker ? null : SUITS[card.suit];
+    const suitClass = card.isJoker ? "is-joker" : `suit-${card.suit}`;
+
+    const elemBadgeHtml = card.isJoker
+      ? `<span class="fu-ace-card-elem is-joker"><i class="fa-solid fa-crown"></i></span>`
+      : `<span class="fu-ace-card-elem">${getOfficialElementIconHtml(card.suit)}</span>`;
+
+    previewEl.innerHTML = `
+      <div class="fu-ace-vp-card ${card.isJoker ? "is-joker-card" : ""}">
+        <img src="${getCardImageUrl(card)}" data-fallback="${fallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="${card.name}" />
+        <div class="fu-ace-card-corner">
+          <span class="fu-ace-card-tag ${suitClass}">${card.shortLabel}</span>
+          ${elemBadgeHtml}
+        </div>
+      </div>
+      <div class="fu-ace-vp-info">
+        <strong>${card.name}</strong>
+        <span>Vanguarda • Clique para revelar</span>
+      </div>
+    `;
+
+    const modalRect = this.element.getBoundingClientRect();
+    const slotRect = slotEl.getBoundingClientRect();
+    const topOffset = Math.max(8, slotRect.top - modalRect.top - 24);
+    previewEl.style.top = `${topOffset}px`;
+
+    // Abre à direita do slot; se estiver colado na borda direita da tela, abre à esquerda
+    if (modalRect.right + 168 > window.innerWidth) {
+      previewEl.classList.add("is-left");
+    } else {
+      previewEl.classList.remove("is-left");
+    }
+
+    previewEl.classList.add("is-visible");
+  }
+
+  hideVanguardPreview() {
+    const previewEl = this.element?.querySelector("#fu-ace-vanguard-preview");
+    if (previewEl) {
+      previewEl.classList.remove("is-visible");
+    }
+  }
+
+  // ==================== ANIMAÇÃO DE COMPRA (BARALHO -> MÃO + EMPURRAR) ====================
 
   runDrawAnimations(animPayload) {
     if (!animPayload || !this.element) return;
-    const { newCardIds, prevRects } = animPayload;
+    const { newCardIds, cardCenters, deckCenter } = animPayload;
     const cardEls = Array.from(this.element.querySelectorAll(".fu-ace-card[data-card-id]"));
     if (!cardEls.length) return;
 
     const transitionsToRestore = [];
 
+    // 1. Cartas que já estavam na mão deslizam suavemente para a direita
     for (const el of cardEls) {
       const id = el.dataset.cardId;
       if (newCardIds.has(id)) continue;
-      const oldRect = prevRects.get(id);
-      if (!oldRect) continue;
+      const oldCenter = cardCenters.get(id);
+      if (!oldCenter) continue;
 
       const newRect = el.getBoundingClientRect();
-      const dx = oldRect.left - newRect.left;
-      const dy = oldRect.top - newRect.top;
+      const newCenterX = newRect.left + newRect.width / 2;
+      const newCenterY = newRect.top + newRect.height / 2;
+      const dx = oldCenter.x - newCenterX;
+      const dy = oldCenter.y - newCenterY;
 
       if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
         const targetTransform = el.style.transform || "";
         el.style.transition = "none";
         el.style.transform = `translate(${dx}px, ${dy}px) ${targetTransform}`;
-        transitionsToRestore.push({ el, targetTransform });
+        transitionsToRestore.push({ el, targetTransform, isDrawn: false });
       }
     }
 
+    // 2. Cartas compradas saem de cima do Baralho (verso) e giram até entrar na mão
     const drawnEls = cardEls.filter(el => newCardIds.has(el.dataset.cardId));
-    for (const el of drawnEls) {
+    drawnEls.forEach((el, idx) => {
+      const newRect = el.getBoundingClientRect();
+      const newCenterX = newRect.left + newRect.width / 2;
+      const newCenterY = newRect.top + newRect.height / 2;
+      const dx = deckCenter ? deckCenter.x - newCenterX : -185;
+      const dy = deckCenter ? deckCenter.y - newCenterY : 0;
+
       const targetTransform = el.style.transform || "";
+      const originalZIndex = el.style.zIndex;
+
       el.style.transition = "none";
-      el.style.transform = `translate(-48px, -10px) rotateY(180deg) scale(0.92)`;
-      transitionsToRestore.push({ el, targetTransform, isDrawn: true });
-    }
+      el.style.zIndex = String(115 + idx);
+      el.style.transform = `translate(${dx}px, ${dy}px) scale(0.92) rotateY(180deg)`;
+      transitionsToRestore.push({
+        el,
+        targetTransform,
+        originalZIndex,
+        isDrawn: true,
+        delayMs: idx * 65
+      });
+    });
 
     if (!transitionsToRestore.length) return;
 
+    // Força reflow para registrar a posição inicial antes de animar
     void this.element.offsetWidth;
 
     requestAnimationFrame(() => {
       for (const item of transitionsToRestore) {
+        const delay = item.delayMs ? ` ${item.delayMs}ms` : "";
         item.el.style.transition = item.isDrawn
-          ? "transform 0.58s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease"
-          : "transform 0.46s cubic-bezier(0.22, 1, 0.36, 1)";
+          ? `transform 0.62s cubic-bezier(0.22, 1, 0.36, 1)${delay}, box-shadow 0.3s ease`
+          : `transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)`;
         item.el.style.transform = item.targetTransform;
       }
 
@@ -745,16 +840,18 @@ export class AceOfCardsModal {
         for (const item of transitionsToRestore) {
           if (!item.el.isConnected) continue;
           item.el.style.transition = "";
+          if (item.originalZIndex) item.el.style.zIndex = item.originalZIndex;
           item.el.classList.remove("is-newly-drawn");
           item.el.querySelector(".fu-ace-card-flip-back")?.remove();
         }
-      }, 620);
+      }, 920);
     });
   }
 
   // ==================== RENDERIZAÇÃO DA INTERFACE ====================
 
   render() {
+    this._renderVersion++;
     if (!this.element || !this.isOpen) return;
 
     const animPayload = this.pendingDrawAnim;
@@ -878,7 +975,7 @@ export class AceOfCardsModal {
           return `<div class="fu-ace-vanguard-slot is-empty" title="Slot Vanguarda ${slotIdx + 1}">Vanguarda ${slotIdx + 1}</div>`;
         }
         return `
-          <div class="fu-ace-vanguard-slot has-card" data-vanguard-idx="${slotIdx}" title="Clique para revelar Carta de Vanguarda">
+          <div class="fu-ace-vanguard-slot has-card" data-vanguard-idx="${slotIdx}">
             <img src="${backImg}" data-fallback="${backFallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="Vanguarda" />
             <span>Revelar #${slotIdx + 1}</span>
           </div>
@@ -994,7 +1091,7 @@ export class AceOfCardsModal {
       <div class="fu-ace-body">
         <div class="fu-ace-piles-col">
           <div class="fu-ace-pile-box" title="Baralho (${state.deck.length}/30 cartas)">
-            <div class="fu-ace-pile-card">
+            <div class="fu-ace-pile-card fu-ace-pile-deck">
               ${
                 state.deck.length > 0
                   ? `<img src="${backImg}" data-fallback="${backFallback}" onerror="this.onerror=null; this.src=this.dataset.fallback;" alt="Baralho" />`
@@ -1114,18 +1211,21 @@ export class AceOfCardsModal {
         </div>
       </div>
 
+      <!-- Preview flutuante à direita para cartas da Vanguarda -->
+      <div id="fu-ace-vanguard-preview" class="fu-ace-vanguard-preview" aria-hidden="true"></div>
+
       ${discardViewerHtml}
       ${trapPickerOverlayHtml}
     `;
 
-    this.bindEvents(activeCombo, canEdit);
+    this.bindEvents(activeCombo, canEdit, state);
 
     if (animPayload) {
       this.runDrawAnimations(animPayload);
     }
   }
 
-  bindEvents(activeCombo, canEdit) {
+  bindEvents(activeCombo, canEdit, state) {
     this.bindDrag(this.element.querySelector(".fu-ace-header"));
 
     this.element.querySelectorAll("[data-action='close']").forEach(btn =>
@@ -1162,8 +1262,17 @@ export class AceOfCardsModal {
     });
 
     this.element.querySelectorAll(".fu-ace-vanguard-slot[data-vanguard-idx]").forEach(slotEl => {
+      const idx = Number(slotEl.dataset.vanguardIdx);
+      slotEl.addEventListener("mouseenter", () => {
+        const card = state?.vanguard?.[idx];
+        if (card) this.showVanguardPreview(card, slotEl);
+      });
+      slotEl.addEventListener("mouseleave", () => {
+        this.hideVanguardPreview();
+      });
       slotEl.addEventListener("click", () => {
-        this.actionRevealVanguard(Number(slotEl.dataset.vanguardIdx));
+        this.hideVanguardPreview();
+        this.actionRevealVanguard(idx);
       });
     });
 
